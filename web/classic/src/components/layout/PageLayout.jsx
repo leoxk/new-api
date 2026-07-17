@@ -111,7 +111,7 @@ const PageLayout = () => {
       document.title = systemName;
     }
     let logo = getLogo();
-    if (logo) {
+    if (logo && logo !== '/logo.png') {
       let linkElement = document.querySelector("link[rel~='icon']");
       if (linkElement) {
         linkElement.href = logo;

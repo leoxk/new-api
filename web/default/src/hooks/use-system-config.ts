@@ -182,7 +182,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
       logo,
       () => {
         setLoadedLogoUrl(logo)
-        applyFaviconToDom(logo)
+        if (logo !== DEFAULT_LOGO) applyFaviconToDom(logo)
       },
       () => {
         if (logo !== DEFAULT_LOGO) {
