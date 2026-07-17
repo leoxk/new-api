@@ -10,6 +10,7 @@ services:
       SQL_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_CONN_STRING: redis://:${REDIS_PASSWORD}@redis:6379
       SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_COOKIE_SECURE: "true"
       CRYPTO_SECRET: ${CRYPTO_SECRET}
       TZ: Asia/Manila
       NODE_NAME: glimo-b2b-payment-staging
