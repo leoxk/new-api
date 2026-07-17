@@ -46,6 +46,14 @@ rollback() {
   echo "staging deployment failed; rolling back to $old_image" >&2
   NEW_API_IMAGE="$old_image" compose up -d --no-deps new-api
 }
+
+abort_deployment() {
+  echo "$1" >&2
+  trap - ERR
+  rollback
+  exit 1
+}
+
 trap rollback ERR
 
 NEW_API_IMAGE="$image" compose pull
@@ -55,8 +63,7 @@ if [ "$host_arch" = "aarch64" ]; then
   host_arch="arm64"
 fi
 if [ "$image_arch" != "$host_arch" ]; then
-  echo "image architecture mismatch: image=$image_arch host=$host_arch" >&2
-  exit 1
+  abort_deployment "image architecture mismatch: image=$image_arch host=$host_arch"
 fi
 NEW_API_IMAGE="$image" compose up -d
 
@@ -65,8 +72,7 @@ for attempt in $(seq 1 12); do
     break
   fi
   if [ "$attempt" -eq 12 ]; then
-    echo "local staging health check failed" >&2
-    exit 1
+    abort_deployment "local staging health check failed"
   fi
   sleep 5
 done
@@ -75,8 +81,7 @@ curl --fail --silent --show-error "$public_health_url" >/dev/null
 running_container=$(compose ps --quiet new-api)
 running_image=$(docker inspect --format '{{.Config.Image}}' "$running_container")
 if [ "$running_image" != "$image" ]; then
-  echo "running image mismatch: expected $image, got $running_image" >&2
-  exit 1
+  abort_deployment "running image mismatch: expected $image, got $running_image"
 fi
 
 trap - ERR
