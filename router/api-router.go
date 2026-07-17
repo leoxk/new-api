@@ -12,6 +12,16 @@ import (
 )
 
 func SetApiRouter(router *gin.Engine) {
+	internalUsageRouter := router.Group("/internal-api")
+	internalUsageRouter.Use(middleware.RouteTag("api"))
+	internalUsageRouter.Use(gzip.Gzip(gzip.DefaultCompression))
+	internalUsageRouter.Use(middleware.GlobalAPIRateLimit())
+	internalUsageRouter.Use(middleware.CORS())
+	{
+		internalUsageRouter.GET("/ai-usage", controller.GetAIUsage)
+		internalUsageRouter.OPTIONS("/ai-usage", controller.AIUsageOptions)
+	}
+
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.RouteTag("api"))
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
