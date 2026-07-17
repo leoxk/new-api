@@ -1,6 +1,8 @@
 name: Glimo B2B staging
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       deploy:
