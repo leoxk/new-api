@@ -506,6 +506,15 @@ func GetSelf(c *gin.Context) {
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
 		"permissions":       permissions,                // 新增权限字段
 	}
+	if user.Group == "b2b" {
+		walletBalance, err := model.GetUserWalletBalance(user.Id, user.Quota)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		responseData["recharge_quota"] = walletBalance.RechargeQuota
+		responseData["promotional_quota"] = walletBalance.PromotionalQuota
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

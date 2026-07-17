@@ -5178,6 +5178,25 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Recharge Balance": "Recharge Balance",
+    "Promotional Credit": "Promotional Credit",
+    "Total Balance": "Total Balance",
+    "Cash topups eligible for manual refund review": "Cash topups eligible for manual refund review",
+    "Used first; non-refundable and non-transferable": "Used first; non-refundable and non-transferable",
+    "Recharge balance plus promotional credit": "Recharge balance plus promotional credit",
+    "Refund & Support": "Refund & Support",
+    "Promotional Credit is used first and is non-refundable and non-transferable.": "Promotional Credit is used first and is non-refundable and non-transferable.",
+    "Unused Recharge Balance may be refunded after manual review of successful topups, prior refunds, current balance, and usage history.": "Unused Recharge Balance may be refunded after manual review of successful topups, prior refunds, current balance, and usage history.",
+    "Contact support to request a refund or company invoice. Payment receipts are provided by the payment processor.": "Contact support to request a refund or company invoice. Payment receipts are provided by the payment processor.",
+    "Recorded Refund": "Recorded Refund",
+    "Provider Refund ID": "Provider Refund ID",
+    "Record Completed Refund": "Record Completed Refund",
+    "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.",
+    "Refund Amount": "Refund Amount",
+    "Customer requested refund of unused cash balance": "Customer requested refund of unused cash balance",
+    "Record Refund": "Record Refund",
+    "Completed refund recorded successfully": "Completed refund recorded successfully",
+    "Failed to record completed refund": "Failed to record completed refund"
   }
 }

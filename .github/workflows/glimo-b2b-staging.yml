@@ -1,0 +1,178 @@
+name: Glimo B2B staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Build, push, and deploy to the protected staging environment
+        required: true
+        default: false
+        type: boolean
+      rollback_image:
+        description: Optional immutable GHCR image tag/digest to deploy instead of this commit
+        required: false
+        type: string
+
+concurrency:
+  group: glimo-b2b-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Type-check and build frontend
+        working-directory: web/default
+        run: bun run build:check
+
+      - name: Prepare classic embed fixture for backend tests
+        run: |
+          mkdir -p web/classic/dist
+          printf '<!doctype html><title>test fixture</title>\n' > web/classic/dist/index.html
+
+      - name: Test backend
+        run: go test ./...
+
+  image:
+    if: ${{ inputs.deploy }}
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.value }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set immutable image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ROLLBACK_IMAGE: ${{ inputs.rollback_image }}
+        run: |
+          if [ -n "$ROLLBACK_IMAGE" ]; then
+            image="$ROLLBACK_IMAGE"
+          else
+            image="ghcr.io/${REPOSITORY,,}:staging-${SHA}"
+          fi
+          echo "value=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: ${{ inputs.rollback_image == '' }}
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build and push immutable staging image
+        if: ${{ inputs.rollback_image == '' }}
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+  deploy:
+    if: ${{ inputs.deploy }}
+    needs: image
+    runs-on: ubuntu-latest
+    environment: glimo-gateway-staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install pinned cloudflared
+        env:
+          CLOUDFLARED_VERSION: 2026.6.0
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" \
+            --output "$RUNNER_TEMP/cloudflared"
+          chmod 0755 "$RUNNER_TEMP/cloudflared"
+
+      - name: Configure ephemeral SSH client
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ vars.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 0700 -d "$RUNNER_TEMP/ssh"
+          install -m 0600 /dev/null "$RUNNER_TEMP/ssh/key"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/ssh/key"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          cat > "$RUNNER_TEMP/ssh/config" <<EOF
+          Host glimo-staging
+            HostName ${{ vars.DEPLOY_HOST }}
+            User ${{ vars.DEPLOY_USER }}
+            IdentityFile $RUNNER_TEMP/ssh/key
+            UserKnownHostsFile $RUNNER_TEMP/ssh/known_hosts
+            StrictHostKeyChecking yes
+            ProxyCommand $RUNNER_TEMP/cloudflared access ssh --hostname %h
+          EOF
+          chmod 0600 "$RUNNER_TEMP/ssh/config"
+
+      - name: Transfer and execute version-controlled deployment script
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          STAGING_LOCAL_HEALTH_URL: ${{ vars.STAGING_LOCAL_HEALTH_URL }}
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+          STAGING_RUNTIME_ENV: ${{ secrets.STAGING_RUNTIME_ENV }}
+        run: |
+          remote_script="/tmp/glimo-b2b-deploy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          remote_env="/dev/shm/glimo-b2b-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.env"
+          install -m 0600 /dev/null "$RUNNER_TEMP/runtime.env"
+          printf '%s\n' "$STAGING_RUNTIME_ENV" > "$RUNNER_TEMP/runtime.env"
+          scp -F "$RUNNER_TEMP/ssh/config" scripts/deploy-glimo-b2b-staging.sh "glimo-staging:$remote_script"
+          scp -F "$RUNNER_TEMP/ssh/config" "$RUNNER_TEMP/runtime.env" "glimo-staging:$remote_env"
+          ssh -F "$RUNNER_TEMP/ssh/config" glimo-staging \
+            "chmod 0700 '$remote_script' && chmod 0600 '$remote_env' && '$remote_script' '$DEPLOY_PATH' '$IMAGE' '$STAGING_LOCAL_HEALTH_URL' '$STAGING_PUBLIC_HEALTH_URL' '$remote_env'; status=\$?; rm -f '$remote_script' '$remote_env'; exit \$status"
+
+      - name: Verify public staging endpoint from runner
+        env:
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+        run: curl --fail --silent --show-error "$STAGING_PUBLIC_HEALTH_URL"
+
+      - name: Remove ephemeral credentials
+        if: always()
+        run: |
+          find "$RUNNER_TEMP/ssh" -type f -delete 2>/dev/null || true
+          find "$RUNNER_TEMP/ssh" -type d -empty -delete 2>/dev/null || true
+          find "$RUNNER_TEMP" -maxdepth 1 -name runtime.env -type f -delete 2>/dev/null || true

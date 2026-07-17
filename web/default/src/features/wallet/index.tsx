@@ -75,6 +75,7 @@ export function Wallet(props: WalletProps) {
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
   const [showSubscriptionPanel, setShowSubscriptionPanel] = useState(true)
+  const isB2B = user?.group === 'b2b'
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
@@ -269,7 +270,7 @@ export function Wallet(props: WalletProps) {
 
             <div
               className={
-                showSubscriptionPanel
+                showSubscriptionPanel && !isB2B
                   ? 'grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:items-start'
                   : 'grid gap-4'
               }
@@ -308,23 +309,50 @@ export function Wallet(props: WalletProps) {
                 />
               </div>
 
-              <SubscriptionPlansCard
-                topupInfo={topupInfo}
-                onAvailabilityChange={handleSubscriptionAvailabilityChange}
-                userQuota={user?.quota}
-                onPurchaseSuccess={fetchUser}
-              />
+              {!isB2B && (
+                <SubscriptionPlansCard
+                  topupInfo={topupInfo}
+                  onAvailabilityChange={handleSubscriptionAvailabilityChange}
+                  userQuota={user?.quota}
+                  onPurchaseSuccess={fetchUser}
+                />
+              )}
             </div>
 
-            <AffiliateRewardsCard
-              user={user}
-              affiliateLink={affiliateLink}
-              onTransfer={() => setTransferDialogOpen(true)}
-              complianceConfirmed={
-                topupInfo?.payment_compliance_confirmed !== false
-              }
-              loading={affiliateLoading}
-            />
+            {isB2B ? (
+              <section className='rounded-lg border p-4 sm:p-5'>
+                <h2 className='text-sm font-semibold'>
+                  {t('Refund & Support')}
+                </h2>
+                <div className='text-muted-foreground mt-2 space-y-1 text-sm'>
+                  <p>
+                    {t(
+                      'Promotional Credit is used first and is non-refundable and non-transferable.'
+                    )}
+                  </p>
+                  <p>
+                    {t(
+                      'Unused Recharge Balance may be refunded after manual review of successful topups, prior refunds, current balance, and usage history.'
+                    )}
+                  </p>
+                  <p>
+                    {t(
+                      'Contact support to request a refund or company invoice. Payment receipts are provided by the payment processor.'
+                    )}
+                  </p>
+                </div>
+              </section>
+            ) : (
+              <AffiliateRewardsCard
+                user={user}
+                affiliateLink={affiliateLink}
+                onTransfer={() => setTransferDialogOpen(true)}
+                complianceConfirmed={
+                  topupInfo?.payment_compliance_confirmed !== false
+                }
+                loading={affiliateLoading}
+              />
+            )}
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>

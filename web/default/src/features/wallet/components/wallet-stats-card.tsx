@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Activity, BarChart3, WalletCards } from 'lucide-react'
+import { Activity, BarChart3, Gift, Landmark, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
@@ -35,13 +35,15 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   if (props.loading) {
     return (
       <div className='grid grid-cols-3 divide-x rounded-lg border'>
-        {['balance', 'usage', 'requests'].map((key) => (
-          <div key={key} className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'>
-            <Skeleton className='h-3.5 w-full' />
-            <Skeleton className='mt-2 h-6 w-full sm:h-7' />
-            <Skeleton className='mt-1.5 hidden h-3.5 w-24 md:block' />
-          </div>
-        ))}
+        {['balance', 'recharge', 'promotion', 'usage', 'requests'].map(
+          (key) => (
+            <div key={key} className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'>
+              <Skeleton className='h-3.5 w-full' />
+              <Skeleton className='mt-2 h-6 w-full sm:h-7' />
+              <Skeleton className='mt-1.5 hidden h-3.5 w-24 md:block' />
+            </div>
+          )
+        )}
       </div>
     )
   }
@@ -76,8 +78,40 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
     },
   ]
 
+  if (props.user?.group === 'b2b') {
+    stats.splice(
+      1,
+      0,
+      {
+        label: t('Recharge Balance'),
+        value: formatQuota(props.user.recharge_quota ?? 0),
+        description: t('Cash topups eligible for manual refund review'),
+        icon: Landmark,
+        tone: 'info',
+      },
+      {
+        label: t('Promotional Credit'),
+        value: formatQuota(props.user.promotional_quota ?? 0),
+        description: t('Used first; non-refundable and non-transferable'),
+        icon: Gift,
+        tone: 'chart-4',
+      }
+    )
+    stats[0] = {
+      ...stats[0],
+      label: t('Total Balance'),
+      description: t('Recharge balance plus promotional credit'),
+    }
+  }
+
   return (
-    <div className='grid grid-cols-3 divide-x rounded-lg border'>
+    <div
+      className={`grid divide-x rounded-lg border ${
+        stats.length === 5
+          ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-5'
+          : 'grid-cols-3'
+      }`}
+    >
       {stats.map((item) => (
         <div key={item.label} className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'>
           <div className='flex items-center gap-1.5 sm:gap-2.5'>

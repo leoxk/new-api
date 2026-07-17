@@ -51,6 +51,13 @@ func GetTopUpInfo(c *gin.Context) {
 			payMethods = append(payMethods, stripeMethod)
 		}
 	}
+	if isPayPalTopUpEnabled() {
+		payMethods = append(payMethods, map[string]string{
+			"name":      "PayPal",
+			"type":      model.PaymentMethodPayPal,
+			"min_topup": strconv.FormatInt(getMinTopup(), 10),
+		})
+	}
 
 	// Waffo Pancake displayed above the legacy Waffo gateway.
 	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
@@ -98,6 +105,7 @@ func GetTopUpInfo(c *gin.Context) {
 	data := gin.H{
 		"enable_online_topup":              isEpayTopUpEnabled(),
 		"enable_stripe_topup":              isStripeTopUpEnabled(),
+		"enable_paypal_topup":              isPayPalTopUpEnabled(),
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
@@ -491,6 +499,13 @@ type AdminCompleteTopupRequest struct {
 	TradeNo string `json:"trade_no"`
 }
 
+type AdminRecordCompletedTopUpRefundRequest struct {
+	TradeNo          string `json:"trade_no"`
+	RefundedMoney    string `json:"refunded_money"`
+	ProviderRefundId string `json:"provider_refund_id"`
+	Reason           string `json:"reason"`
+}
+
 // AdminCompleteTopUp 管理员补单接口
 func AdminCompleteTopUp(c *gin.Context) {
 	var req AdminCompleteTopupRequest
@@ -508,4 +523,35 @@ func AdminCompleteTopUp(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, nil)
+}
+
+// AdminRecordCompletedTopUpRefund records a refund that an operator has already
+// completed in the payment provider. It never initiates a provider-side refund.
+func AdminRecordCompletedTopUpRefund(c *gin.Context) {
+	var req AdminRecordCompletedTopUpRefundRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.TradeNo == "" || req.ProviderRefundId == "" || req.Reason == "" {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	refundedMoney, err := decimal.NewFromString(req.RefundedMoney)
+	if err != nil || !refundedMoney.IsPositive() || refundedMoney.Exponent() < -2 {
+		common.ApiErrorMsg(c, "退款金额必须是最多两位小数的正数")
+		return
+	}
+
+	LockOrder(req.TradeNo)
+	defer UnlockOrder(req.TradeNo)
+
+	topUp, err := model.RecordCompletedTopUpRefund(req.TradeNo, refundedMoney, req.ProviderRefundId, req.Reason)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	recordManageAuditFor(c, topUp.UserId, "topup.refund_record", map[string]interface{}{
+		"trade_no":           topUp.TradeNo,
+		"refunded_money":     req.RefundedMoney,
+		"provider_refund_id": topUp.ProviderRefundId,
+		"reason":             topUp.RefundReason,
+	})
+	common.ApiSuccess(c, topUp)
 }

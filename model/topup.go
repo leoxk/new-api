@@ -12,20 +12,25 @@ import (
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	Id               int     `json:"id"`
+	UserId           int     `json:"user_id" gorm:"index"`
+	Amount           int64   `json:"amount"`
+	Money            float64 `json:"money"`
+	RefundedMoney    float64 `json:"refunded_money" gorm:"not null;default:0"`
+	ProviderRefundId string  `json:"provider_refund_id" gorm:"type:varchar(255);default:''"`
+	RefundRecordedAt int64   `json:"refund_recorded_at" gorm:"bigint;not null;default:0"`
+	RefundReason     string  `json:"refund_reason" gorm:"type:varchar(500);default:''"`
+	TradeNo          string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	PaymentMethod    string  `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider  string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	CreateTime       int64   `json:"create_time"`
+	CompleteTime     int64   `json:"complete_time"`
+	Status           string  `json:"status"`
 }
 
 const (
 	PaymentMethodStripe       = "stripe"
+	PaymentMethodPayPal       = "paypal"
 	PaymentMethodCreem        = "creem"
 	PaymentMethodWaffo        = "waffo"
 	PaymentMethodWaffoPancake = "waffo_pancake"
@@ -35,6 +40,7 @@ const (
 const (
 	PaymentProviderEpay         = "epay"
 	PaymentProviderStripe       = "stripe"
+	PaymentProviderPayPal       = "paypal"
 	PaymentProviderCreem        = "creem"
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
@@ -42,10 +48,130 @@ const (
 )
 
 var (
-	ErrPaymentMethodMismatch = errors.New("payment method mismatch")
-	ErrTopUpNotFound         = errors.New("topup not found")
-	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
+	ErrPaymentMethodMismatch        = errors.New("payment method mismatch")
+	ErrTopUpNotFound                = errors.New("topup not found")
+	ErrTopUpStatusInvalid           = errors.New("topup status invalid")
+	ErrTopUpAlreadyRefunded         = errors.New("topup already has a recorded refund")
+	ErrRefundExceedsTopUp           = errors.New("refund exceeds topup amount")
+	ErrRefundExceedsRechargeBalance = errors.New("refund exceeds refundable recharge balance")
+	ErrTopUpPaymentAmountMismatch   = errors.New("payment amount does not match topup order")
+	ErrTopUpPaymentCurrencyMismatch = errors.New("payment currency does not match topup order")
 )
+
+type WalletBalance struct {
+	RechargeQuota    int `json:"recharge_quota"`
+	PromotionalQuota int `json:"promotional_quota"`
+}
+
+func getUserNetCashQuota(tx *gorm.DB, userId int) (int, error) {
+	var netCash float64
+	err := tx.Model(&TopUp{}).
+		Where("user_id = ? AND status = ?", userId, common.TopUpStatusSuccess).
+		Select("COALESCE(SUM(money - refunded_money), 0)").
+		Scan(&netCash).Error
+	if err != nil {
+		return 0, err
+	}
+	if netCash <= 0 {
+		return 0, nil
+	}
+	quota, clamp := common.QuotaFromDecimalChecked(decimal.NewFromFloat(netCash).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
+	if clamp != nil {
+		return 0, fmt.Errorf("net cash quota is outside the supported range")
+	}
+	return quota, nil
+}
+
+func GetUserWalletBalance(userId int, totalQuota int) (WalletBalance, error) {
+	if totalQuota < 0 {
+		totalQuota = 0
+	}
+	netCashQuota, err := getUserNetCashQuota(DB, userId)
+	if err != nil {
+		return WalletBalance{}, err
+	}
+	rechargeQuota := netCashQuota
+	if rechargeQuota > totalQuota {
+		rechargeQuota = totalQuota
+	}
+	return WalletBalance{
+		RechargeQuota:    rechargeQuota,
+		PromotionalQuota: totalQuota - rechargeQuota,
+	}, nil
+}
+
+func RecordCompletedTopUpRefund(tradeNo string, refundedMoney decimal.Decimal, providerRefundId string, reason string) (*TopUp, error) {
+	if tradeNo == "" || providerRefundId == "" || reason == "" || !refundedMoney.IsPositive() {
+		return nil, errors.New("invalid completed refund record")
+	}
+
+	var refundedQuota int
+	var refundedTopUp TopUp
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		tradeNoCol := "`trade_no`"
+		if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
+			tradeNoCol = `"trade_no"`
+		}
+		if err := lockForUpdate(tx).Where(tradeNoCol+" = ?", tradeNo).First(&refundedTopUp).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrTopUpNotFound
+			}
+			return err
+		}
+		if refundedTopUp.Status != common.TopUpStatusSuccess {
+			return ErrTopUpStatusInvalid
+		}
+		if refundedTopUp.RefundedMoney > 0 || refundedTopUp.ProviderRefundId != "" {
+			return ErrTopUpAlreadyRefunded
+		}
+		if refundedMoney.GreaterThan(decimal.NewFromFloat(refundedTopUp.Money)) {
+			return ErrRefundExceedsTopUp
+		}
+
+		var user User
+		if err := lockForUpdate(tx).Where("id = ?", refundedTopUp.UserId).First(&user).Error; err != nil {
+			return err
+		}
+		netCashQuota, err := getUserNetCashQuota(tx, refundedTopUp.UserId)
+		if err != nil {
+			return err
+		}
+		rechargeQuota := netCashQuota
+		if rechargeQuota > user.Quota {
+			rechargeQuota = user.Quota
+		}
+		refundedQuota, clamp := common.QuotaFromDecimalChecked(refundedMoney.Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
+		if clamp != nil {
+			return ErrRefundExceedsRechargeBalance
+		}
+		if refundedQuota > rechargeQuota {
+			return ErrRefundExceedsRechargeBalance
+		}
+
+		result := tx.Model(&User{}).
+			Where("id = ? AND quota >= ?", refundedTopUp.UserId, refundedQuota).
+			Update("quota", gorm.Expr("quota - ?", refundedQuota))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrRefundExceedsRechargeBalance
+		}
+
+		refundedTopUp.RefundedMoney = refundedMoney.InexactFloat64()
+		refundedTopUp.ProviderRefundId = providerRefundId
+		refundedTopUp.RefundRecordedAt = common.GetTimestamp()
+		refundedTopUp.RefundReason = reason
+		return tx.Save(&refundedTopUp).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := cacheDecrUserQuota(refundedTopUp.UserId, int64(refundedQuota)); err != nil {
+		common.SysError("failed to update user quota cache after refund: " + err.Error())
+	}
+	return &refundedTopUp, nil
+}
 
 func (topUp *TopUp) Insert() error {
 	var err error
@@ -106,12 +232,13 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 	})
 }
 
-func Recharge(referenceId string, customerId string, callerIp string) (err error) {
+func CompleteCashTopUp(referenceId string, expectedProvider string, customerId string, callerIp string, paidMinorUnits int64, currency string) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")
 	}
 
 	var quota float64
+	credited := false
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -125,12 +252,22 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return errors.New("充值订单不存在")
 		}
 
-		if topUp.PaymentProvider != PaymentProviderStripe {
+		if topUp.PaymentProvider != expectedProvider {
 			return ErrPaymentMethodMismatch
+		}
+		if currency != "USD" {
+			return ErrTopUpPaymentCurrencyMismatch
+		}
+		expectedMinorUnits := decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromInt(100))
+		if !expectedMinorUnits.Equal(decimal.NewFromInt(paidMinorUnits)) {
+			return ErrTopUpPaymentAmountMismatch
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
-			return errors.New("充值订单状态错误")
+			if topUp.Status == common.TopUpStatusSuccess {
+				return nil
+			}
+			return ErrTopUpStatusInvalid
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -141,20 +278,30 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		}
 
 		quota = topUp.Money * common.QuotaPerUnit
-		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"stripe_customer": customerId, "quota": gorm.Expr("quota + ?", quota)}).Error
+		updates := map[string]interface{}{"quota": gorm.Expr("quota + ?", quota)}
+		if expectedProvider == PaymentProviderStripe && customerId != "" {
+			updates["stripe_customer"] = customerId
+		}
+		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(updates).Error
 		if err != nil {
 			return err
 		}
+		credited = true
 
 		return nil
 	})
 
 	if err != nil {
 		common.SysError("topup failed: " + err.Error())
+		if errors.Is(err, ErrTopUpPaymentAmountMismatch) || errors.Is(err, ErrTopUpPaymentCurrencyMismatch) {
+			return err
+		}
 		return errors.New("充值失败，请稍后重试")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(int(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
+	if credited {
+		RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(int(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, expectedProvider)
+	}
 
 	return nil
 }

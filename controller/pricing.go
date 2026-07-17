@@ -33,6 +33,20 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 	return filtered
 }
 
+func filterPricingByEnabledModels(pricing []model.Pricing, enabledModels []string) []model.Pricing {
+	allowed := make(map[string]struct{}, len(enabledModels))
+	for _, modelName := range enabledModels {
+		allowed[modelName] = struct{}{}
+	}
+	filtered := make([]model.Pricing, 0, len(pricing))
+	for _, item := range pricing {
+		if _, ok := allowed[item.ModelName]; ok {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 func GetPricing(c *gin.Context) {
 	pricing := model.GetPricing()
 	userId, exists := c.Get("id")
@@ -57,6 +71,17 @@ func GetPricing(c *gin.Context) {
 
 	usableGroup = service.GetUserUsableGroups(group)
 	pricing = filterPricingByUsableGroups(pricing, usableGroup)
+	if group == "b2b" {
+		enabledModels := make([]string, 0)
+		for _, autoGroup := range service.GetUserAutoGroup(group) {
+			for _, modelName := range model.GetGroupEnabledModels(autoGroup) {
+				if !common.StringsContains(enabledModels, modelName) {
+					enabledModels = append(enabledModels, modelName)
+				}
+			}
+		}
+		pricing = filterPricingByEnabledModels(pricing, enabledModels)
+	}
 	// check groupRatio contains usableGroup
 	for group := range ratio_setting.GetGroupRatioCopy() {
 		if _, ok := usableGroup[group]; !ok {
