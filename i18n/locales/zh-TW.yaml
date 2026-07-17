@@ -114,6 +114,16 @@ quota.insufficient: "額度不足"
 quota.warning_invalid: "無效的預警類型"
 quota.threshold_gt_zero: "預警閾值必須大於0"
 
+# 郵件訊息
+email.verification_subject: "{{.SystemName}}電子郵件驗證"
+email.verification_body: "<p>您好，您正在進行{{.SystemName}}電子郵件驗證。</p><p>您的驗證碼為：<strong>{{.Code}}</strong></p><p>驗證碼在 {{.Minutes}} 分鐘內有效；如果不是您本人操作，請忽略此郵件。</p>"
+email.password_reset_subject: "{{.SystemName}}密碼重設"
+email.password_reset_body: "<p>您好，您正在進行{{.SystemName}}密碼重設。</p><p>點擊<a href='{{.Link}}'>此處</a>重設密碼。</p><p>如果連結無法點擊，請複製下方連結並在瀏覽器中開啟：<br> {{.Link}} </p><p>重設連結在 {{.Minutes}} 分鐘內有效；如果不是您本人操作，請忽略此郵件。</p>"
+email.quota_low_subject: "您的額度即將用完"
+email.subscription_quota_low_subject: "您的訂閱額度即將用完"
+email.quota_low_body: "目前剩餘額度為 {{.Remaining}}，為避免影響使用，請及時儲值。<br/>儲值連結：<a href='{{.Link}}'>{{.Link}}</a>"
+email.quota_low_text: "目前剩餘額度為 {{.Remaining}}，請及時儲值。"
+
 # Subscription messages
 subscription.not_enabled: "訂閱方案未啟用"
 subscription.title_empty: "訂閱方案標題不能為空"

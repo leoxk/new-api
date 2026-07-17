@@ -113,6 +113,16 @@ quota.insufficient: "Insufficient quota"
 quota.warning_invalid: "Invalid warning type"
 quota.threshold_gt_zero: "Warning threshold must be greater than 0"
 
+# Email messages
+email.verification_subject: "{{.SystemName}} email verification"
+email.verification_body: "<p>Hello, you are verifying your email address for {{.SystemName}}.</p><p>Your verification code is: <strong>{{.Code}}</strong></p><p>The code is valid for {{.Minutes}} minutes. If you did not request this, please ignore this email.</p>"
+email.password_reset_subject: "{{.SystemName}} password reset"
+email.password_reset_body: "<p>Hello, you requested a password reset for {{.SystemName}}.</p><p>Click <a href='{{.Link}}'>here</a> to reset your password.</p><p>If the link is not clickable, copy and open the following URL in your browser:<br> {{.Link}} </p><p>The reset link is valid for {{.Minutes}} minutes. If you did not request this, please ignore this email.</p>"
+email.quota_low_subject: "Your balance is running low"
+email.subscription_quota_low_subject: "Your subscription quota is running low"
+email.quota_low_body: "Your remaining quota is {{.Remaining}}. Please top up soon to avoid service interruption.<br/>Top-up link: <a href='{{.Link}}'>{{.Link}}</a>"
+email.quota_low_text: "Your remaining quota is {{.Remaining}}. Please top up soon."
+
 # Subscription messages
 subscription.not_enabled: "Subscription plan is not enabled"
 subscription.title_empty: "Subscription plan title cannot be empty"
