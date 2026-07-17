@@ -9,6 +9,9 @@ Date: 2026-07-17 (Asia/Manila)
 - First-deploy fix PR: `#2`
 - Successful deployment run: `29590873241`
 - Deployed image: `ghcr.io/leoxk/new-api:staging-2da2193cef36f625534b5136b169c241469372e1`
+- Final image build/deployment run: `29595606051`
+- Current restore run: `29596336428`
+- Current image: `ghcr.io/leoxk/new-api:staging-dccda5cbff4e193aabbc6c7db2ad66e7c375acf3`
 - Image platform: `linux/arm64`
 - Local health: `http://127.0.0.1:3100/api/status` returned HTTP 200.
 - Public health: `https://staging-llm.glimolab.com/api/status` returned HTTP 200.
@@ -17,6 +20,35 @@ The first deployment exposed two deployment-only defects: the container health
 check sent `HEAD` to a GET-only endpoint, and the final Compose inspection did
 not retain `NEW_API_IMAGE`. Both were fixed through PR #2 and the complete
 workflow was rerun successfully.
+
+### Secure-session recovery and rollback exercise
+
+Deployment run `29593744121` failed after `SESSION_COOKIE_SECURE=true` was
+enabled without the required `SESSION_COOKIE_TRUSTED_URL`. Container logs
+showed the exact startup error, while PostgreSQL and Redis remained healthy and
+their volumes retained all staging data. PR #4 added the single trusted HTTPS
+origin `https://staging-llm.glimolab.com`; recovery run `29594711437` then
+passed the complete test, image, deployment, local-health, and public-health
+jobs.
+
+The failure also proved that an explicit `exit 1` in the deployment script did
+not invoke its Bash `ERR` trap. PR #5 added an explicit abort-and-rollback path
+for architecture, local-health, and running-image validation failures. Final
+deployment run `29595606051` passed.
+
+The GitHub Actions `rollback_image` path was then exercised in both directions:
+
+| Action | Workflow run | Result |
+|---|---:|---|
+| Roll back to `staging-2da2193cef36f625534b5136b169c241469372e1` | `29596142681` | Passed; local/public health 200 |
+| Restore `staging-dccda5cbff4e193aabbc6c7db2ad66e7c375acf3` | `29596336428` | Passed; local/public health 200 |
+
+After both transitions, the staging database still contained three controlled
+users and two top-up orders. The `b2btest` wallet remained at total 17,500,000
+quota, recharge 17,500,000 quota, and promotional zero; the recorded US$40
+refund and provider refund ID `stg-test-refund-001` remained intact. The four
+staging volumes and the isolated `glimo-b2b-staging-network` were unchanged,
+and no `glimo-b2b-*` deployment files remained in `/dev/shm` or `/tmp`.
 
 ## Isolation
 
