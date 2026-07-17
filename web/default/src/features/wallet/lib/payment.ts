@@ -33,8 +33,8 @@ import type { PresetAmount, TopupInfo } from '../types'
  */
 function isSafariBrowser(): boolean {
   return (
-    navigator.userAgent.indexOf('Safari') > -1 &&
-    navigator.userAgent.indexOf('Chrome') < 1
+    navigator.userAgent.includes('Safari') &&
+    !navigator.userAgent.includes('Chrome')
   )
 }
 
@@ -73,6 +73,10 @@ export function submitPaymentForm(
  */
 export function isStripePayment(paymentType: string): boolean {
   return paymentType === PAYMENT_TYPES.STRIPE
+}
+
+export function isPayPalPayment(paymentType: string): boolean {
+  return paymentType === PAYMENT_TYPES.PAYPAL
 }
 
 /**

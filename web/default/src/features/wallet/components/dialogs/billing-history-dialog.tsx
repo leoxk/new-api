@@ -54,6 +54,7 @@ import {
   getPaymentMethodName,
   formatTimestamp,
 } from '../../lib/billing'
+import type { TopupRecord } from '../../types'
 
 interface BillingHistoryDialogProps {
   open: boolean
@@ -73,14 +74,20 @@ export function BillingHistoryDialog({
     keyword,
     loading,
     completing,
+    recordingRefund,
     isAdmin,
     handlePageChange,
     handlePageSizeChange,
     handleSearch,
     handleCompleteOrder,
+    handleRecordCompletedRefund,
   } = useBillingHistory()
 
   const [confirmTradeNo, setConfirmTradeNo] = useState<string | null>(null)
+  const [refundRecord, setRefundRecord] = useState<TopupRecord | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [providerRefundId, setProviderRefundId] = useState('')
+  const [refundReason, setRefundReason] = useState('')
   const { copyToClipboard, copiedText } = useCopyToClipboard({ notify: false })
 
   const totalPages = Math.ceil(total / pageSize)
@@ -92,6 +99,31 @@ export function BillingHistoryDialog({
         setConfirmTradeNo(null)
       }
     }
+  }
+
+  const openRefundDialog = (record: TopupRecord) => {
+    setRefundRecord(record)
+    setRefundAmount(record.money.toFixed(2))
+    setProviderRefundId('')
+    setRefundReason('')
+  }
+
+  const closeRefundDialog = () => {
+    setRefundRecord(null)
+    setRefundAmount('')
+    setProviderRefundId('')
+    setRefundReason('')
+  }
+
+  const handleConfirmRefund = async () => {
+    if (!refundRecord) return
+    const success = await handleRecordCompletedRefund({
+      trade_no: refundRecord.trade_no,
+      refunded_money: refundAmount,
+      provider_refund_id: providerRefundId.trim(),
+      reason: refundReason.trim(),
+    })
+    if (success) closeRefundDialog()
   }
 
   return (
@@ -128,7 +160,7 @@ export function BillingHistoryDialog({
               ]}
               value={pageSize.toString()}
               onValueChange={(value) =>
-                value !== null && handlePageSizeChange(parseInt(value))
+                value !== null && handlePageSizeChange(Number.parseInt(value))
               }
             >
               <SelectTrigger className='h-9 w-[92px] sm:w-32'>
@@ -147,10 +179,18 @@ export function BillingHistoryDialog({
 
           {/* Records List */}
           <div className='max-h-[min(54vh,520px)] overflow-y-auto pr-1'>
+            {/* Existing three-state rendering is kept local to the scroll container. */}
+            {/* eslint-disable-next-line no-nested-ternary */}
             {loading ? (
               <div className='space-y-3'>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className='rounded-lg border p-3 sm:p-4'>
+                {[
+                  'billing-skeleton-1',
+                  'billing-skeleton-2',
+                  'billing-skeleton-3',
+                  'billing-skeleton-4',
+                  'billing-skeleton-5',
+                ].map((key) => (
+                  <div key={key} className='rounded-lg border p-3 sm:p-4'>
                     <div className='flex items-start justify-between'>
                       <div className='flex-1 space-y-2'>
                         <Skeleton className='h-4 w-48' />
@@ -258,6 +298,24 @@ export function BillingHistoryDialog({
                         </div>
                       </div>
 
+                      {!!record.refunded_money && (
+                        <div className='bg-muted/40 mt-3 rounded-md border p-3 text-xs'>
+                          <div className='font-medium'>
+                            {t('Recorded Refund')}:{' '}
+                            {formatNumber(record.refunded_money)}
+                          </div>
+                          <div className='text-muted-foreground mt-1 break-all'>
+                            {t('Provider Refund ID')}:{' '}
+                            {record.provider_refund_id}
+                          </div>
+                          {record.refund_reason && (
+                            <div className='text-muted-foreground mt-1'>
+                              {t('Reason')}: {record.refund_reason}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Admin Actions */}
                       {isAdmin && record.status === 'pending' && (
                         <div className='mt-4 flex justify-end'>
@@ -271,6 +329,20 @@ export function BillingHistoryDialog({
                           </Button>
                         </div>
                       )}
+                      {isAdmin &&
+                        record.status === 'success' &&
+                        !record.refunded_money && (
+                          <div className='mt-4 flex justify-end'>
+                            <Button
+                              size='sm'
+                              variant='outline'
+                              onClick={() => openRefundDialog(record)}
+                              disabled={recordingRefund}
+                            >
+                              {t('Record Completed Refund')}
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   )
                 })}
@@ -338,6 +410,72 @@ export function BillingHistoryDialog({
               disabled={completing}
             >
               {completing ? t('Processing...') : t('Confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!refundRecord}
+        onOpenChange={(open) => !open && closeRefundDialog()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('Record Completed Refund')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                'Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='space-y-3 py-2'>
+            <div className='space-y-1.5'>
+              <Label htmlFor='refund-amount'>{t('Refund Amount')}</Label>
+              <Input
+                id='refund-amount'
+                inputMode='decimal'
+                value={refundAmount}
+                onChange={(event) => setRefundAmount(event.target.value)}
+                placeholder='0.00'
+              />
+            </div>
+            <div className='space-y-1.5'>
+              <Label htmlFor='provider-refund-id'>
+                {t('Provider Refund ID')}
+              </Label>
+              <Input
+                id='provider-refund-id'
+                value={providerRefundId}
+                onChange={(event) => setProviderRefundId(event.target.value)}
+                placeholder='re_...'
+              />
+            </div>
+            <div className='space-y-1.5'>
+              <Label htmlFor='refund-reason'>{t('Reason')}</Label>
+              <Input
+                id='refund-reason'
+                value={refundReason}
+                onChange={(event) => setRefundReason(event.target.value)}
+                placeholder={t(
+                  'Customer requested refund of unused cash balance'
+                )}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={recordingRefund}>
+              {t('Cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRefund}
+              disabled={
+                recordingRefund ||
+                !refundAmount ||
+                !providerRefundId.trim() ||
+                !refundReason.trim()
+              }
+            >
+              {recordingRefund ? t('Processing...') : t('Record Refund')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

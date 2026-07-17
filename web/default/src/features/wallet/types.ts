@@ -39,6 +39,7 @@ export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
+export type PayPalPaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
 export type AffiliateTransferResponse = ApiResponse
 export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
@@ -124,6 +125,8 @@ export interface TopupInfo {
   enable_online_topup: boolean
   /** Whether Stripe topup is enabled */
   enable_stripe_topup: boolean
+  /** Whether PayPal Checkout topup is enabled */
+  enable_paypal_topup?: boolean
   /** Available payment methods */
   pay_methods: PaymentMethod[]
   /** Minimum topup amount for online topup */
@@ -230,6 +233,10 @@ export interface UserWalletData {
   username: string
   /** Current quota balance */
   quota: number
+  /** Refundable balance derived from successful cash topups */
+  recharge_quota?: number
+  /** Non-refundable promotional credit derived from non-cash grants */
+  promotional_quota?: number
   /** Total used quota */
   used_quota: number
   /** Total request count */
@@ -261,6 +268,14 @@ export interface TopupRecord {
   amount: number
   /** Payment amount (actual money paid) */
   money: number
+  /** Provider-confirmed refunded amount recorded by an administrator */
+  refunded_money?: number
+  /** Refund identifier returned by the payment provider */
+  provider_refund_id?: string
+  /** Timestamp when the completed refund was recorded */
+  refund_recorded_at?: number
+  /** Operator-provided refund reason */
+  refund_reason?: string
   /** Trade/order number */
   trade_no: string
   /** Payment method type */
@@ -286,4 +301,11 @@ export interface BillingHistoryResponse {
  */
 export interface CompleteOrderRequest {
   trade_no: string
+}
+
+export interface RecordCompletedRefundRequest {
+  trade_no: string
+  refunded_money: string
+  provider_refund_id: string
+  reason: string
 }

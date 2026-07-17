@@ -29,10 +29,12 @@ import type {
   AmountResponse,
   PaymentResponse,
   StripePaymentResponse,
+  PayPalPaymentResponse,
   AffiliateCodeResponse,
   AffiliateTransferResponse,
   BillingHistoryResponse,
   CompleteOrderRequest,
+  RecordCompletedRefundRequest,
   CreemPaymentRequest,
   CreemPaymentResponse,
   WaffoPaymentRequest,
@@ -116,6 +118,24 @@ export async function requestStripePayment(
   request: PaymentRequest
 ): Promise<StripePaymentResponse> {
   const res = await api.post('/api/user/stripe/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function calculatePayPalAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/user/paypal/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestPayPalPayment(
+  request: AmountRequest
+): Promise<PayPalPaymentResponse> {
+  const res = await api.post('/api/user/paypal/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
@@ -232,5 +252,15 @@ export async function completeOrder(
   request: CompleteOrderRequest
 ): Promise<ApiResponse> {
   const res = await api.post('/api/user/topup/complete', request)
+  return res.data
+}
+
+/**
+ * Record a refund that has already completed in Stripe or PayPal (admin only).
+ */
+export async function recordCompletedRefund(
+  request: RecordCompletedRefundRequest
+): Promise<ApiResponse> {
+  const res = await api.post('/api/user/topup/refund-record', request)
   return res.data
 }

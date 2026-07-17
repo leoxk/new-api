@@ -15,13 +15,13 @@ func isStripeTopUpEnabled() bool {
 	if !isPaymentComplianceConfirmed() {
 		return false
 	}
-	return strings.TrimSpace(setting.StripeApiSecret) != "" &&
-		strings.TrimSpace(setting.StripeWebhookSecret) != "" &&
-		strings.TrimSpace(setting.StripePriceId) != ""
+	return strings.TrimSpace(setting.GetStripeAPISecret()) != "" &&
+		strings.TrimSpace(setting.GetStripeWebhookSecret()) != "" &&
+		strings.TrimSpace(setting.GetStripePriceID()) != ""
 }
 
 func isStripeWebhookConfigured() bool {
-	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
+	return strings.TrimSpace(setting.GetStripeWebhookSecret()) != ""
 }
 
 func isStripeWebhookEnabled() bool {

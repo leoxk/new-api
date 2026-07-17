@@ -26,9 +26,10 @@ import {
   getUserBillingHistory,
   getAllBillingHistory,
   completeOrder,
+  recordCompletedRefund,
   isApiSuccess,
 } from '../api'
-import type { TopupRecord } from '../types'
+import type { RecordCompletedRefundRequest, TopupRecord } from '../types'
 
 // ============================================================================
 // Billing History Hook
@@ -52,6 +53,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [recordingRefund, setRecordingRefund] = useState(false)
 
   /**
    * Fetch billing history
@@ -118,6 +120,36 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     [isAdmin, fetchBillingHistory]
   )
 
+  const handleRecordCompletedRefund = useCallback(
+    async (request: RecordCompletedRefundRequest) => {
+      if (!isAdmin) {
+        toast.error(i18next.t('Admin access required'))
+        return false
+      }
+      setRecordingRefund(true)
+      try {
+        const response = await recordCompletedRefund(request)
+        if (isApiSuccess(response)) {
+          toast.success(i18next.t('Completed refund recorded successfully'))
+          await fetchBillingHistory()
+          return true
+        }
+        toast.error(
+          response.message || i18next.t('Failed to record completed refund')
+        )
+        return false
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to record completed refund:', error)
+        toast.error(i18next.t('Failed to record completed refund'))
+        return false
+      } finally {
+        setRecordingRefund(false)
+      }
+    },
+    [isAdmin, fetchBillingHistory]
+  )
+
   /**
    * Change page
    */
@@ -154,11 +186,13 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     keyword,
     loading,
     completing,
+    recordingRefund,
     isAdmin,
     handlePageChange,
     handlePageSizeChange,
     handleSearch,
     handleCompleteOrder,
+    handleRecordCompletedRefund,
     refresh: fetchBillingHistory,
   }
 }

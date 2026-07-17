@@ -55,6 +55,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/ratio_config", middleware.CriticalRateLimit(), controller.GetRatioConfig)
 
 		apiRouter.POST("/stripe/webhook", anonymousRequestBodyLimit, controller.StripeWebhook)
+		apiRouter.POST("/paypal/webhook", anonymousRequestBodyLimit, controller.PayPalWebhook)
+		apiRouter.GET("/paypal/return", controller.PayPalReturn)
 		apiRouter.POST("/creem/webhook", anonymousRequestBodyLimit, controller.CreemWebhook)
 		apiRouter.POST("/waffo/webhook", anonymousRequestBodyLimit, controller.WaffoWebhook)
 		// :env separates test vs prod URLs so the operator can register each
@@ -100,6 +102,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/amount", controller.RequestAmount)
 				selfRoute.POST("/stripe/pay", middleware.CriticalRateLimit(), controller.RequestStripePay)
 				selfRoute.POST("/stripe/amount", controller.RequestStripeAmount)
+				selfRoute.POST("/paypal/amount", controller.RequestPayPalAmount)
+				selfRoute.POST("/paypal/pay", middleware.CriticalRateLimit(), controller.RequestPayPalPay)
 				selfRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestCreemPay)
 				selfRoute.POST("/waffo/amount", controller.RequestWaffoAmount)
 				selfRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPay)
@@ -130,6 +134,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
+				adminRoute.POST("/topup/refund-record", controller.AdminRecordCompletedTopUpRefund)
 				adminRoute.GET("/search", controller.SearchUsers)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)

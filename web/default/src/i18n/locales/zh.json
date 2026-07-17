@@ -5178,6 +5178,25 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Recharge Balance": "充值余额",
+    "Promotional Credit": "促销赠送额度",
+    "Total Balance": "总余额",
+    "Cash topups eligible for manual refund review": "现金充值形成，可申请人工退款审核",
+    "Used first; non-refundable and non-transferable": "优先使用，不可退款、不可转移",
+    "Recharge balance plus promotional credit": "充值余额与促销赠送额度合计",
+    "Refund & Support": "退款与支持",
+    "Promotional Credit is used first and is non-refundable and non-transferable.": "促销赠送额度会优先消费，且不可退款、不可转移。",
+    "Unused Recharge Balance may be refunded after manual review of successful topups, prior refunds, current balance, and usage history.": "未使用的充值余额可在人工核对成功充值、历史退款、当前余额和用量记录后退款。",
+    "Contact support to request a refund or company invoice. Payment receipts are provided by the payment processor.": "如需退款或公司发票，请联系支持人员。付款收据由支付处理器提供。",
+    "Recorded Refund": "已登记退款",
+    "Provider Refund ID": "支付处理器退款 ID",
+    "Record Completed Refund": "登记已完成退款",
+    "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "仅在 Stripe 或 PayPal 已完成退款后使用。本操作只登记退款并从充值余额扣除相同金额，不会向客户付款。",
+    "Refund Amount": "退款金额",
+    "Customer requested refund of unused cash balance": "客户申请退还未使用的现金余额",
+    "Record Refund": "登记退款",
+    "Completed refund recorded successfully": "已成功登记完成的退款",
+    "Failed to record completed refund": "登记已完成退款失败"
   }
 }
