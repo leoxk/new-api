@@ -18,10 +18,10 @@ database, Redis instance, Docker network, or named volumes.
 - No production sidecars or production volumes are mounted.
 - Payment credentials must be Stripe Test Mode and PayPal Sandbox only.
 
-The public staging hostname is expected to route through the existing VPS
-Cloudflare Tunnel to `http://localhost:3100`. The deployment hostname must be a
-separate `deploy-` hostname protected by a project-specific Cloudflare Access
-Service Token.
+The public staging hostname routes through the existing VPS Cloudflare Tunnel
+to `http://localhost:3100`. GitHub Actions deploys directly to the public VPS
+SSH hostname with a project-specific SSH key, a pinned host key, and strict host
+key checking. A Cloudflare Access Service Token is not required for deployment.
 
 ## Runtime variables
 
