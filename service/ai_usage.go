@@ -2,13 +2,28 @@ package service
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"golang.org/x/sync/singleflight"
 )
 
-const defaultAIUsageCapacityPath = "/quota-state/last-good.json"
+const (
+	defaultAIUsageCapacityPath = "/quota-state/last-good.json"
+	aiUsageCacheTTL            = 5 * time.Minute
+)
+
+type aiUsageCacheEntry struct {
+	response  *AIUsageResponse
+	expiresAt time.Time
+}
+
+var (
+	aiUsageCache        sync.Map
+	aiUsageRefreshGroup singleflight.Group
+)
 
 type AIUsageResponse struct {
 	SchemaVersion    int                  `json:"schema_version"`
@@ -59,6 +74,40 @@ type aiUsageCapacityCacheWindow struct {
 
 func GetAIUsage(username string, now time.Time) (*AIUsageResponse, error) {
 	now = now.UTC()
+	if cached, ok := aiUsageCache.Load(username); ok {
+		entry := cached.(aiUsageCacheEntry)
+		if now.Before(entry.expiresAt) {
+			return entry.response, nil
+		}
+		aiUsageCache.Delete(username)
+	}
+
+	value, err, _ := aiUsageRefreshGroup.Do(username, func() (any, error) {
+		if cached, ok := aiUsageCache.Load(username); ok {
+			entry := cached.(aiUsageCacheEntry)
+			if now.Before(entry.expiresAt) {
+				return entry.response, nil
+			}
+			aiUsageCache.Delete(username)
+		}
+
+		response, err := buildAIUsageResponse(username, now)
+		if err != nil {
+			return nil, err
+		}
+		aiUsageCache.Store(username, aiUsageCacheEntry{
+			response:  response,
+			expiresAt: now.Add(aiUsageCacheTTL),
+		})
+		return response, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*AIUsageResponse), nil
+}
+
+func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, error) {
 	data, err := model.GetAIUsageByUsername(username, now.Unix())
 	if err != nil {
 		return nil, err
