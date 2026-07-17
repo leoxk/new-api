@@ -57,7 +57,7 @@ jobs:
   image:
     if: ${{ inputs.deploy }}
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -97,7 +97,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.image.outputs.value }}
           cache-from: type=gha
@@ -157,13 +157,15 @@ jobs:
           STAGING_RUNTIME_ENV: ${{ secrets.STAGING_RUNTIME_ENV }}
         run: |
           remote_script="/tmp/glimo-b2b-deploy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          remote_compose="/tmp/glimo-b2b-compose-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.yml"
           remote_env="/dev/shm/glimo-b2b-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.env"
           install -m 0600 /dev/null "$RUNNER_TEMP/runtime.env"
           printf '%s\n' "$STAGING_RUNTIME_ENV" > "$RUNNER_TEMP/runtime.env"
           scp -F "$RUNNER_TEMP/ssh/config" scripts/deploy-glimo-b2b-staging.sh "glimo-staging:$remote_script"
+          scp -F "$RUNNER_TEMP/ssh/config" deploy/glimo-b2b-staging/compose.yml "glimo-staging:$remote_compose"
           scp -F "$RUNNER_TEMP/ssh/config" "$RUNNER_TEMP/runtime.env" "glimo-staging:$remote_env"
           ssh -F "$RUNNER_TEMP/ssh/config" glimo-staging \
-            "chmod 0700 '$remote_script' && chmod 0600 '$remote_env' && '$remote_script' '$DEPLOY_PATH' '$IMAGE' '$STAGING_LOCAL_HEALTH_URL' '$STAGING_PUBLIC_HEALTH_URL' '$remote_env'; status=\$?; rm -f '$remote_script' '$remote_env'; exit \$status"
+            "chmod 0700 '$remote_script' && chmod 0600 '$remote_env' && '$remote_script' '$DEPLOY_PATH' '$IMAGE' '$STAGING_LOCAL_HEALTH_URL' '$STAGING_PUBLIC_HEALTH_URL' '$remote_env' '$remote_compose'; status=\$?; rm -f '$remote_script' '$remote_env' '$remote_compose'; exit \$status"
 
       - name: Verify public staging endpoint from runner
         env:

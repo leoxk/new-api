@@ -22,6 +22,8 @@
 
 staging GitHub Environment 必须配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_PATH`、固定的 `DEPLOY_SSH_KNOWN_HOSTS`、内外健康检查 URL，以及 `DEPLOY_SSH_PRIVATE_KEY`、独立 Cloudflare Access Service Token 和 `STAGING_RUNTIME_ENV` Secrets。运行时支付凭证只通过 `/dev/shm` 临时文件注入并在部署结束时删除；staging Compose 必须显式引用这些环境变量。
 
+当前 staging 固定使用 Compose project `glimo-b2b-staging`、本机监听 `127.0.0.1:3100`、独立 Docker network `glimo-b2b-staging-network`，以及带 `glimo-b2b-staging-` 前缀的 4 个 named volumes。验收时必须证明 staging 容器没有加入 `vps-oci-sgp-new-api_new-api-network`，也没有挂载任何生产 volume。
+
 ## 回滚
 
 1. GitHub Actions 选择上一个已通过验收的不可变镜像 SHA。
