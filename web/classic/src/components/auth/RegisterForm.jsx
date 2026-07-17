@@ -67,7 +67,7 @@ import { SiDiscord } from 'react-icons/si';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const githubButtonTextKeyByState = {
     idle: '使用 GitHub 继续',
     redirecting: '正在跳转 GitHub...',
@@ -264,6 +264,11 @@ const RegisterForm = () => {
     try {
       const res = await API.get(
         `/api/verification?email=${encodeURIComponent(inputs.email)}&turnstile=${turnstileToken}`,
+        {
+          headers: {
+            'Accept-Language': i18n.resolvedLanguage || i18n.language,
+          },
+        },
       );
       const { success, message } = res.data;
       if (success) {

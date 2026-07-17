@@ -35,7 +35,7 @@ import { useTranslation } from 'react-i18next';
 const { Text, Title } = Typography;
 
 const PasswordResetForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [inputs, setInputs] = useState({
     email: '',
   });
@@ -92,6 +92,11 @@ const PasswordResetForm = () => {
     setLoading(true);
     const res = await API.get(
       `/api/reset_password?email=${email}&turnstile=${turnstileToken}`,
+      {
+        headers: {
+          'Accept-Language': i18n.resolvedLanguage || i18n.language,
+        },
+      },
     );
     const { success, message } = res.data;
     if (success) {

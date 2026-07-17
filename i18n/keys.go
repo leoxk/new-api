@@ -128,6 +128,18 @@ const (
 	MsgQuotaThresholdGtZero = "quota.threshold_gt_zero"
 )
 
+// Email related messages
+const (
+	MsgEmailVerificationSubject         = "email.verification_subject"
+	MsgEmailVerificationBody            = "email.verification_body"
+	MsgEmailPasswordResetSubject        = "email.password_reset_subject"
+	MsgEmailPasswordResetBody           = "email.password_reset_body"
+	MsgEmailQuotaLowSubject             = "email.quota_low_subject"
+	MsgEmailSubscriptionQuotaLowSubject = "email.subscription_quota_low_subject"
+	MsgEmailQuotaLowBody                = "email.quota_low_body"
+	MsgEmailQuotaLowText                = "email.quota_low_text"
+)
+
 // Subscription related messages
 const (
 	MsgSubscriptionNotEnabled       = "subscription.not_enabled"

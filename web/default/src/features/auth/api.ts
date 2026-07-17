@@ -1,3 +1,5 @@
+import i18next from 'i18next'
+
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -71,6 +73,9 @@ export async function sendPasswordResetEmail(
 ): Promise<ApiResponse> {
   const res = await api.get('/api/reset_password', {
     params: { email, turnstile },
+    headers: {
+      'Accept-Language': i18next.resolvedLanguage || i18next.language,
+    },
   })
   return res.data
 }
@@ -119,6 +124,9 @@ export async function sendEmailVerification(
 ): Promise<ApiResponse> {
   const res = await api.get('/api/verification', {
     params: { email, turnstile },
+    headers: {
+      'Accept-Language': i18next.resolvedLanguage || i18next.language,
+    },
   })
   return res.data
 }

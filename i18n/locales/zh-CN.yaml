@@ -114,6 +114,16 @@ quota.insufficient: "额度不足"
 quota.warning_invalid: "无效的预警类型"
 quota.threshold_gt_zero: "预警阈值必须大于0"
 
+# 邮件消息
+email.verification_subject: "{{.SystemName}}邮箱验证邮件"
+email.verification_body: "<p>您好，您正在进行{{.SystemName}}邮箱验证。</p><p>您的验证码为：<strong>{{.Code}}</strong></p><p>验证码 {{.Minutes}} 分钟内有效，如果不是本人操作，请忽略此邮件。</p>"
+email.password_reset_subject: "{{.SystemName}}密码重置"
+email.password_reset_body: "<p>您好，您正在进行{{.SystemName}}密码重置。</p><p>点击<a href='{{.Link}}'>此处</a>重置密码。</p><p>如果链接无法点击，请复制下面的链接并在浏览器中打开：<br> {{.Link}} </p><p>重置链接 {{.Minutes}} 分钟内有效，如果不是本人操作，请忽略此邮件。</p>"
+email.quota_low_subject: "您的额度即将用尽"
+email.subscription_quota_low_subject: "您的订阅额度即将用尽"
+email.quota_low_body: "当前剩余额度为 {{.Remaining}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{.Link}}'>{{.Link}}</a>"
+email.quota_low_text: "当前剩余额度为 {{.Remaining}}，请及时充值。"
+
 # Subscription messages
 subscription.not_enabled: "套餐未启用"
 subscription.title_empty: "套餐标题不能为空"
