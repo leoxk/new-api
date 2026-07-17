@@ -14,6 +14,11 @@ runtime_env=$5
 compose_source=$6
 compose_file="$deploy_path/compose.yml"
 
+# The compose file requires NEW_API_IMAGE during every command, including
+# inspection commands after startup. Export the requested image as the default;
+# rollback can still override it for a single compose invocation.
+export NEW_API_IMAGE="$image"
+
 cleanup() {
   rm -f "$runtime_env"
 }

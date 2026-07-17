@@ -35,7 +35,7 @@ services:
     networks:
       - staging-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:3000/api/status"]
+      test: ["CMD", "wget", "--quiet", "--output-document=-", "http://127.0.0.1:3000/api/status"]
       interval: 10s
       timeout: 5s
       retries: 12
