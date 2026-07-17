@@ -111,7 +111,7 @@ const PageLayout = () => {
       document.title = systemName;
     }
     let logo = getLogo();
-    if (logo && logo !== '/logo.png') {
+    if (logo && logo !== '/logo.png?v=glimo-20260717') {
       let linkElement = document.querySelector("link[rel~='icon']");
       if (linkElement) {
         linkElement.href = logo;
