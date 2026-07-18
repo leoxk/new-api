@@ -214,6 +214,8 @@ updated through the authenticated admin UI:
 - Preset amount `20` added
 - Wallet verification: `20/20`, `25/25`, `50/50`, `100/100`, `250/250`, and
   `500/500`; Stripe remained the only payment method
+- Custom amount `US$19` disabled the Stripe button with `Minimum: 20`, while
+  `US$20` enabled it
 
 The production value remains unchanged pending the separate production canary
 approval.
