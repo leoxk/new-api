@@ -1,0 +1,138 @@
+name: Glimo B2B staging operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Staging operation to run
+        required: true
+        type: choice
+        options:
+          - record_completed_stripe_refund
+      trade_no:
+        description: Exact New API staging top-up order number
+        required: true
+        type: string
+      provider_refund_id:
+        description: Completed Stripe Sandbox refund ID (re_...)
+        required: true
+        type: string
+      refunded_money:
+        description: Completed refund amount in USD (maximum two decimals)
+        required: true
+        type: string
+      reason:
+        description: Audit reason for the completed refund
+        required: true
+        type: string
+
+concurrency:
+  group: glimo-b2b-staging-operations
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  record-completed-stripe-refund:
+    if: ${{ inputs.operation == 'record_completed_stripe_refund' }}
+    runs-on: ubuntu-latest
+    environment: glimo-gateway-staging
+    steps:
+      - name: Validate and record completed Stripe Sandbox refund
+        env:
+          STAGING_ADMIN_ACCESS_TOKEN: ${{ secrets.STAGING_ADMIN_ACCESS_TOKEN }}
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+          TRADE_NO: ${{ inputs.trade_no }}
+          PROVIDER_REFUND_ID: ${{ inputs.provider_refund_id }}
+          REFUNDED_MONEY: ${{ inputs.refunded_money }}
+          REFUND_REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+
+          : "${STAGING_ADMIN_ACCESS_TOKEN:?missing staging admin access token}"
+          : "${STAGING_PUBLIC_HEALTH_URL:?missing staging public health URL}"
+          : "${TRADE_NO:?missing staging top-up order number}"
+          : "${PROVIDER_REFUND_ID:?missing Stripe Sandbox refund ID}"
+          : "${REFUNDED_MONEY:?missing refund amount}"
+          : "${REFUND_REASON:?missing refund reason}"
+
+          if [[ ! "$TRADE_NO" =~ ^ref_[A-Za-z0-9]+$ ]]; then
+            echo "Refusing invalid staging order number" >&2
+            exit 1
+          fi
+          if [[ ! "$PROVIDER_REFUND_ID" =~ ^re_[A-Za-z0-9]+$ ]]; then
+            echo "Refusing invalid Stripe refund ID" >&2
+            exit 1
+          fi
+          if [[ ! "$REFUNDED_MONEY" =~ ^[0-9]+([.][0-9]{1,2})?$ ]] || \
+             ! awk -v amount="$REFUNDED_MONEY" 'BEGIN { exit !(amount > 0) }'; then
+            echo "Refund amount must be a positive USD value with at most two decimals" >&2
+            exit 1
+          fi
+
+          base_url="${STAGING_PUBLIC_HEALTH_URL%/api/status}"
+          auth_headers=(
+            -H "Authorization: Bearer $STAGING_ADMIN_ACCESS_TOKEN"
+            -H "New-Api-User: 1"
+          )
+
+          order_json="$(curl --fail-with-body --silent --show-error \
+            "${auth_headers[@]}" \
+            --get \
+            --data-urlencode "keyword=$TRADE_NO" \
+            --data-urlencode "page=1" \
+            --data-urlencode "page_size=20" \
+            "$base_url/api/user/topup")"
+
+          if ! jq -e \
+            --arg trade_no "$TRADE_NO" \
+            --arg refunded_money "$REFUNDED_MONEY" '
+              .success == true and
+              ([.data.items[] | select(.trade_no == $trade_no)] | length) == 1 and
+              ([.data.items[] | select(.trade_no == $trade_no)][0] |
+                .user_id == 3 and
+                .status == "success" and
+                (.payment_provider == "stripe" or .payment_method == "stripe") and
+                (.refunded_money | tonumber) == 0 and
+                .provider_refund_id == "" and
+                (.money | tonumber) >= ($refunded_money | tonumber)
+              )
+            ' <<<"$order_json" >/dev/null; then
+            echo "Refusing refund: order is not one unrefunded Stripe success order for b2btest" >&2
+            exit 1
+          fi
+
+          payload="$(jq -cn \
+            --arg trade_no "$TRADE_NO" \
+            --arg refunded_money "$REFUNDED_MONEY" \
+            --arg provider_refund_id "$PROVIDER_REFUND_ID" \
+            --arg reason "$REFUND_REASON" \
+            '{
+              trade_no: $trade_no,
+              refunded_money: $refunded_money,
+              provider_refund_id: $provider_refund_id,
+              reason: $reason
+            }')"
+
+          refund_json="$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            "${auth_headers[@]}" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "$base_url/api/user/topup/refund-record")"
+
+          if ! jq -e \
+            --arg trade_no "$TRADE_NO" \
+            --arg provider_refund_id "$PROVIDER_REFUND_ID" \
+            --arg refunded_money "$REFUNDED_MONEY" '
+              .success == true and
+              .data.trade_no == $trade_no and
+              .data.provider_refund_id == $provider_refund_id and
+              (.data.refunded_money | tonumber) == ($refunded_money | tonumber)
+            ' <<<"$refund_json" >/dev/null; then
+            echo "Completed refund record could not be verified" >&2
+            exit 1
+          fi
+
+          echo "Completed Stripe Sandbox refund recorded for the controlled b2btest order"

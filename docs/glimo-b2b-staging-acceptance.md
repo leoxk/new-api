@@ -32,6 +32,8 @@
 
 staging GitHub Environment 必须配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_PATH`、固定的 `DEPLOY_SSH_KNOWN_HOSTS`、内外健康检查 URL，以及 `DEPLOY_SSH_PRIVATE_KEY` 和 `STAGING_RUNTIME_ENV` Secrets。目标是公网 VPS，GitHub Actions 直接通过项目专用 SSH key 连接，不需要 Cloudflare Access Service Token。运行时支付凭证只通过 `/dev/shm` 临时文件注入并在部署结束时删除；staging Compose 必须显式引用这些环境变量。
 
+`Glimo B2B staging operations` 是独立的手动 workflow，只使用受保护的 `STAGING_ADMIN_ACCESS_TOKEN` 登记已经在 Stripe Sandbox 完成的退款。它必须先验证受控客户、订单状态、支付处理器、未退款状态、金额和 `re_...` ID；不得扩展为任意用户、任意余额或生产退款工具。
+
 当前 staging 固定使用 Compose project `glimo-b2b-staging`、本机监听 `127.0.0.1:3100`、独立 Docker network `glimo-b2b-staging-network`，以及带 `glimo-b2b-staging-` 前缀的 4 个 named volumes。验收时必须证明 staging 容器没有加入 `vps-oci-sgp-new-api_new-api-network`，也没有挂载任何生产 volume。
 
 ## 回滚
