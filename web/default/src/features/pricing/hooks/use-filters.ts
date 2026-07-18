@@ -51,7 +51,10 @@ function normalizeViewMode(value: unknown): ViewMode {
   return VIEW_MODES.CARD
 }
 
-export function useFilters(models: PricingModel[]) {
+export function useFilters(
+  models: PricingModel[],
+  options: { showInternalGroups?: boolean } = {}
+) {
   const search = useSearch({ from: '/pricing/' })
   const [filterState, setFilterState] = useState<FilterState>(() => ({
     search: search.search,
@@ -69,7 +72,10 @@ export function useFilters(models: PricingModel[]) {
   const searchInput = filterState.search || ''
   const sortBy = filterState.sort || SORT_OPTIONS.NAME
   const vendorFilter = filterState.vendor || FILTER_ALL
-  const groupFilter = filterState.group || FILTER_ALL
+  const groupFilter =
+    options.showInternalGroups === false
+      ? FILTER_ALL
+      : filterState.group || FILTER_ALL
   const quotaTypeFilter = filterState.quotaType || QUOTA_TYPES.ALL
   const endpointTypeFilter = filterState.endpointType || ENDPOINT_TYPES.ALL
   const tagFilter = filterState.tag || FILTER_ALL

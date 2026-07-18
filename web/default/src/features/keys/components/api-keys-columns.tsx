@@ -35,6 +35,7 @@ import { getUserGroups } from '@/lib/api'
 import dayjs from '@/lib/dayjs'
 import { formatQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { API_KEY_STATUSES } from '../constants'
 import type { ApiKey } from '../types'
@@ -74,6 +75,8 @@ function useGroupRatios(): Record<string, number> {
 
 export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
   const { t, i18n } = useTranslation()
+  const currentUser = useAuthStore((state) => state.auth.user)
+  const approvedCatalog = currentUser?.group === 'b2b'
   const groupRatios = useGroupRatios()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const justNowLabel = t('Just now')
@@ -245,7 +248,12 @@ export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
       id: 'model_limits',
       accessorKey: 'model_limits',
       header: t('Models'),
-      cell: ({ row }) => <ModelLimitsCell apiKey={row.original} />,
+      cell: ({ row }) => (
+        <ModelLimitsCell
+          apiKey={row.original}
+          approvedCatalog={approvedCatalog}
+        />
+      ),
       enableSorting: false,
       size: 160,
       meta: { mobileHidden: true },

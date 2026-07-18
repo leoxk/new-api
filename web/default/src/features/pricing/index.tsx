@@ -21,6 +21,8 @@ import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import {
   LoadingSkeleton,
@@ -38,6 +40,8 @@ import { usePricingData } from './hooks/use-pricing-data'
 
 export function Pricing() {
   const { t } = useTranslation()
+  const currentUser = useAuthStore((state) => state.auth.user)
+  const showInternalGroups = (currentUser?.role ?? ROLE.GUEST) >= ROLE.ADMIN
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null
   )
@@ -81,7 +85,7 @@ export function Pricing() {
     availableTags,
     clearFilters,
     clearSearch,
-  } = useFilters(models || [])
+  } = useFilters(models || [], { showInternalGroups })
 
   const handleModelClick = useCallback((modelName: string) => {
     setSelectedModelName(modelName)
@@ -131,6 +135,7 @@ export function Pricing() {
           tokenUnit={tokenUnit}
           showRechargePrice={showRechargePrice}
           selectedGroup={groupFilter}
+          showInternalGroups={showInternalGroups}
         />
       )
     }
@@ -143,6 +148,7 @@ export function Pricing() {
         tokenUnit={tokenUnit}
         showRechargePrice={showRechargePrice}
         selectedGroup={groupFilter}
+        showInternalGroups={showInternalGroups}
         onModelClick={handleModelClick}
       />
     )
@@ -217,6 +223,7 @@ export function Pricing() {
               vendors={vendors || []}
               groups={availableGroups}
               groupRatios={groupRatio}
+              showInternalGroups={showInternalGroups}
               tags={availableTags}
               models={models || []}
               hasActiveFilters={hasActiveFilters}
@@ -249,6 +256,7 @@ export function Pricing() {
                 vendors={vendors || []}
                 groups={availableGroups}
                 groupRatios={groupRatio}
+                showInternalGroups={showInternalGroups}
                 tags={availableTags}
                 models={models || []}
                 hasActiveFilters={hasActiveFilters}
@@ -280,6 +288,7 @@ export function Pricing() {
               usdExchangeRate={usdExchangeRate ?? 1}
               tokenUnit={tokenUnit}
               showRechargePrice={showRechargePrice}
+              showInternalGroups={showInternalGroups}
             />
           )}
         </PageTransition>
