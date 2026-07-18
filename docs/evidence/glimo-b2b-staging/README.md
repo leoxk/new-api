@@ -98,9 +98,62 @@ The successful refund retained provider refund ID
 records. The refund UI explicitly states that it records a refund already
 completed in Stripe or PayPal and does not send money.
 
-The promotional row used above is a staging fixture. The actual redemption-code
-creation and redemption endpoints remain locked by New API's root compliance
-confirmation and have not been bypassed.
+The promotional row used above is a staging fixture. Root compliance
+confirmation is now complete; creation and redemption of a real staging code
+remain an explicit acceptance test rather than being bypassed with another
+fixture.
+
+## Provider sandbox configuration
+
+On 2026-07-18 the root operator personally confirmed the payment compliance
+statement. Stripe and PayPal sandbox credentials were then stored as separate
+secrets in the protected `glimo-gateway-staging` GitHub Environment. PR #7
+changed the deployment workflow to append them only to the protected ephemeral
+runtime env. Deployment run `29625451246` passed all tests, image build, local
+health, public health, deployment, and cleanup steps.
+
+Stripe sandbox configuration:
+
+- Dedicated account name: `Glimo Lab Sandbox`
+- Legal entity shown by Stripe: `KL Merchandise Limited`
+- Time zone: Hong Kong
+- Brand and accent colors: Glimo primary blue and cyan
+- Successful-payment and refund receipts enabled
+- One-time US$1 prepaid-balance unit price; no subscription price or promotion
+  code
+- Webhook endpoint listens only for the four Checkout Session events handled by
+  the application: completed, expired, async payment succeeded, and async
+  payment failed
+
+PayPal sandbox configuration:
+
+- App name: `Glimo AI Gateway Sandbox`
+- Removed unused Vault, subscriptions, invoicing, payment links, payouts,
+  JavaScript SDK, and mobile SDK permissions
+- Enabled customer-dispute and transaction-search permissions
+- Webhook endpoint listens only for Checkout order approved, the event handled
+  by the application
+
+Runtime provider probes returned HTTP 200 from the Stripe price endpoint and
+PayPal sandbox OAuth. Both public webhook endpoints returned HTTP 400 for an
+unsigned synthetic request, confirming that the endpoints are enabled and
+reject invalid signatures. No provider credential or access token is retained
+in this evidence directory.
+
+### Merchant identity boundary
+
+Glimo Lab may use the same Hong Kong legal entity as Baby Pro Asia, but each
+brand should have a separate merchant account/profile, customer-facing business
+details, statement descriptor, support address, webhook credentials, and
+reconciliation stream. Customer terms and checkout must state that Glimo Lab is
+operated by `KL Merchandise Limited`.
+
+The currently connected PayPal business account displays `BABY PRO INC.` and a
+Philippines sandbox region. It is approved for sandbox integration testing only.
+Do not use it for Glimo Lab production collections unless the merchant of record
+and intercompany arrangement are separately reviewed and approved. The preferred
+production path is a separate PayPal Business account for `KL Merchandise
+Limited`, with Glimo Lab as the customer-facing business name.
 
 ## Screenshots
 
@@ -114,12 +167,13 @@ confirmation and have not been bypassed.
 
 ## Remaining external gates
 
-- A root administrator must personally review and confirm the New API payment
-  compliance statements in the staging dashboard. This unlocks redemption-code
-  and payment testing.
-- Stripe Test Mode is currently at the account login page.
-- PayPal Developer is currently at the account password page.
-- Sandbox credentials must be stored in the GitHub staging Environment and
-  deployed through GitHub Actions before provider end-to-end testing.
+- Enable Chrome extension access to file URLs, then upload the approved Glimo
+  icon and horizontal logo to the Stripe sandbox branding page.
+- Complete real Stripe and PayPal sandbox checkout, failure, cancellation,
+  delayed-event, duplicate-event, and refund tests.
+- Create and redeem a real staging redemption code.
+- Do not activate a Stripe live account or create/use a PayPal production
+  merchant account until merchant identity, public terms, final pricing, and
+  canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
   user, or DeepSeek channel was changed.
