@@ -202,6 +202,22 @@ Only card payments are enabled in the current Stripe product, so a delayed
 payment-method success/failure event is not applicable to the enabled payment
 surface. No Stripe live credential or real payment was used.
 
+### Minimum top-up and refund-fee policy
+
+On 2026-07-18 Leo approved a `US$20` minimum Stripe top-up and confirmed that,
+during the Pilot, Glimo Lab absorbs Stripe's non-returned original transaction
+fee rather than deducting it from an approved customer refund. Staging was
+updated through the authenticated admin UI:
+
+- `StripeMinTopUp`: `10` -> `20`
+- Preset amount `10` removed
+- Preset amount `20` added
+- Wallet verification: `20/20`, `25/25`, `50/50`, `100/100`, `250/250`, and
+  `500/500`; Stripe remained the only payment method
+
+The production value remains unchanged pending the separate production canary
+approval.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
