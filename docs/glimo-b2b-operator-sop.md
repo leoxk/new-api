@@ -8,6 +8,7 @@
 - 不向 B2B 开放 `codex-auto-review`、`dall-e-3` 或其他未批准模型。
 - 注册赠送、邀请奖励、签到奖励和订阅保持关闭；只使用兑换码发放促销额度。
 - Stripe Promotion Codes 和 Amount Discount 保持关闭。
+- Glimo Lab 当前只接入 Stripe；不得在 staging 或生产注入 PayPal 凭证或向客户显示 PayPal 入口。
 - Komodo 仅监控；GitHub Actions 是唯一自动部署路径。
 
 ## 客户审批与测试账号
@@ -41,10 +42,6 @@
 
 每日或有交易日核对支付处理器成功交易与 `top_ups`：订单号、用户、金额、币种、状态和完成时间必须一致。Stripe webhook 必须先验签，再核对本地订单金额与 USD 币种；重复事件不得二次入账。异常订单停止人工补单并保留 request/event ID。
 
-PayPal 只有在商户账号、产品可用地区、Sandbox 和生产凭证获批后才能接入。优先使用 provider-hosted Checkout/Advanced Card 页面，Glimo Lab 不保存卡号或支付凭证。
-
-PayPal Checkout 运行时只从环境变量读取 `PAYPAL_MODE`、`PAYPAL_CLIENT_ID`、`PAYPAL_CLIENT_SECRET`、`PAYPAL_WEBHOOK_ID`。staging 使用 `PAYPAL_MODE=sandbox`；生产切换为 `live` 必须单独批准。Client Secret 和 Webhook ID 只放 GitHub Environment Secrets 注入的临时运行时环境，不写数据库选项、Git、长期 host 文件或日志。
-
 Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_ID` 运行时环境变量覆盖旧设置；Glimo staging/production 必须使用 GitHub Environment Secrets 注入，不在 New API 数据库选项或主机长期文件中保存生产 secret。Stripe Promotion Codes 与 Amount Discount 继续关闭。
 
 ## 人工退款
@@ -52,7 +49,7 @@ Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`ST
 1. 收到申请后冻结该笔退款处理，导出客户成功充值、历史退款和完整 Usage Logs。
 2. 按“Promotional Credit 优先消费”计算：`Recharge Balance = min(users.quota, 成功现金充值 - 已登记退款 - 已确认 chargeback)`。
 3. 复核退款金额不超过原订单金额且不超过当前 Recharge Balance。
-4. 经第二人批准后，在 Stripe/PayPal 原路退款。
+4. 经第二人批准后，在 Stripe 原路退款。
 5. 只有处理器显示完成后，管理员在 Billing History 选择 `Record Completed Refund`，填写处理器 refund ID、金额和原因。
 6. 确认系统在一次事务中写入退款字段并扣除等额 quota；核对 Total = Recharge + Promotional。
 7. 保存处理器凭证、审计日志和客户通知。不得用此按钮发起支付处理器退款。

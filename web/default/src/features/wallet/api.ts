@@ -256,7 +256,7 @@ export async function completeOrder(
 }
 
 /**
- * Record a refund that has already completed in Stripe or PayPal (admin only).
+ * Record a refund that has already completed in Stripe (admin only).
  */
 export async function recordCompletedRefund(
   request: RecordCompletedRefundRequest

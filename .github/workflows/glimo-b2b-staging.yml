@@ -148,16 +148,10 @@ jobs:
           STRIPE_API_SECRET: ${{ secrets.STRIPE_API_SECRET }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
-          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
-          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
-          PAYPAL_WEBHOOK_ID: ${{ secrets.PAYPAL_WEBHOOK_ID }}
         run: |
           : "${STRIPE_API_SECRET:?missing Stripe sandbox secret}"
           : "${STRIPE_WEBHOOK_SECRET:?missing Stripe webhook secret}"
           : "${STRIPE_PRICE_ID:?missing Stripe unit price ID}"
-          : "${PAYPAL_CLIENT_ID:?missing PayPal sandbox client ID}"
-          : "${PAYPAL_CLIENT_SECRET:?missing PayPal sandbox client secret}"
-          : "${PAYPAL_WEBHOOK_ID:?missing PayPal sandbox webhook ID}"
           remote_script="/tmp/glimo-b2b-deploy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
           remote_compose="/tmp/glimo-b2b-compose-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.yml"
           remote_env="/dev/shm/glimo-b2b-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.env"
@@ -167,9 +161,6 @@ jobs:
             STRIPE_API_SECRET "$STRIPE_API_SECRET" \
             STRIPE_WEBHOOK_SECRET "$STRIPE_WEBHOOK_SECRET" \
             STRIPE_PRICE_ID "$STRIPE_PRICE_ID" \
-            PAYPAL_CLIENT_ID "$PAYPAL_CLIENT_ID" \
-            PAYPAL_CLIENT_SECRET "$PAYPAL_CLIENT_SECRET" \
-            PAYPAL_WEBHOOK_ID "$PAYPAL_WEBHOOK_ID" \
             >> "$RUNNER_TEMP/runtime.env"
           scp -F "$RUNNER_TEMP/ssh/config" scripts/deploy-glimo-b2b-staging.sh "glimo-staging:$remote_script"
           scp -F "$RUNNER_TEMP/ssh/config" deploy/glimo-b2b-staging/compose.yml "glimo-staging:$remote_compose"

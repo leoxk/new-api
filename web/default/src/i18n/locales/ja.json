@@ -5192,7 +5192,7 @@
     "Recorded Refund": "Recorded Refund",
     "Provider Refund ID": "Provider Refund ID",
     "Record Completed Refund": "Record Completed Refund",
-    "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.",
+    "Use this only after the refund has completed in Stripe. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "Stripe で返金が完了した後にのみ使用してください。この操作はプロバイダーの返金を記録し、チャージ残高から同額を差し引きます。送金は行いません。",
     "Refund Amount": "Refund Amount",
     "Customer requested refund of unused cash balance": "Customer requested refund of unused cash balance",
     "Record Refund": "Record Refund",

@@ -5192,7 +5192,7 @@
     "Recorded Refund": "已登记退款",
     "Provider Refund ID": "支付处理器退款 ID",
     "Record Completed Refund": "登记已完成退款",
-    "Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "仅在 Stripe 或 PayPal 已完成退款后使用。本操作只登记退款并从充值余额扣除相同金额，不会向客户付款。",
+    "Use this only after the refund has completed in Stripe. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.": "仅在 Stripe 已完成退款后使用。本操作只登记退款并从充值余额扣除相同金额，不会向客户付款。",
     "Refund Amount": "退款金额",
     "Customer requested refund of unused cash balance": "客户申请退还未使用的现金余额",
     "Record Refund": "登记退款",
