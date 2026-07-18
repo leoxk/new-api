@@ -141,10 +141,35 @@ export function ApiKeyCell({ apiKey }: { apiKey: ApiKey }) {
   )
 }
 
-export function ModelLimitsCell({ apiKey }: { apiKey: ApiKey }) {
+export function ModelLimitsCell(props: {
+  apiKey: ApiKey
+  approvedCatalog?: boolean
+}) {
   const { t } = useTranslation()
+  const apiKey = props.apiKey
 
   if (!apiKey.model_limits_enabled || !apiKey.model_limits) {
+    if (props.approvedCatalog) {
+      return (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span>
+                <StatusBadge
+                  label={t('Approved catalog')}
+                  variant='info'
+                  copyable={false}
+                  className='-ml-1.5'
+                />
+              </span>
+            }
+          />
+          <TooltipContent side='top' className='max-w-xs text-xs'>
+            {t('Access is limited to the approved B2B model catalog.')}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
     return (
       <StatusBadge
         label={t('Unlimited')}

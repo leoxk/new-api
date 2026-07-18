@@ -53,6 +53,7 @@ export interface PricingColumnsOptions {
   usdExchangeRate?: number
   showRechargePrice?: boolean
   selectedGroup?: string
+  showInternalGroups?: boolean
 }
 
 export function usePricingColumns(
@@ -65,6 +66,7 @@ export function usePricingColumns(
     usdExchangeRate = 1,
     showRechargePrice = false,
     selectedGroup,
+    showInternalGroups = true,
   } = options
 
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
@@ -391,23 +393,26 @@ export function usePricingColumns(
       enableSorting: false,
     },
 
-    // Enable Groups column
-    {
-      accessorKey: 'enable_groups',
-      header: t('Groups'),
-      cell: ({ row }) => {
-        const groups = row.original.enable_groups || []
-        return (
-          <BadgeListCell
-            items={groups.map((group) => (
-              <GroupBadge key={group} group={group} size='sm' />
-            ))}
-            tooltipClassName='max-w-[280px] p-2'
-          />
-        )
-      },
-      size: 130,
-      enableSorting: false,
-    },
+    ...(showInternalGroups
+      ? [
+          {
+            accessorKey: 'enable_groups',
+            header: t('Groups'),
+            cell: ({ row }) => {
+              const groups = row.original.enable_groups || []
+              return (
+                <BadgeListCell
+                  items={groups.map((group) => (
+                    <GroupBadge key={group} group={group} size='sm' />
+                  ))}
+                  tooltipClassName='max-w-[280px] p-2'
+                />
+              )
+            },
+            size: 130,
+            enableSorting: false,
+          } satisfies ColumnDef<PricingModel>,
+        ]
+      : []),
   ]
 }
