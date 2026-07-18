@@ -42,3 +42,12 @@ STRIPE_PRICE_ID=...
 
 The workflow copies this file to `/dev/shm` only for the duration of deployment
 and removes it on exit. No runtime secret belongs in this directory or Git.
+
+## Controlled customer credential sync
+
+The manual `sync_test_customer` workflow option resets only staging user ID 3
+after first verifying that it is the expected `b2btest` user in group `b2b`.
+The password comes from the protected `STAGING_CUSTOMER_PASSWORD` Environment
+Secret, is verified through the public login endpoint, and is never printed or
+written to the repository or staging host. This option does not deploy an image
+and cannot target production.

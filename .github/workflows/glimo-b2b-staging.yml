@@ -14,6 +14,11 @@ on:
         description: Optional immutable GHCR image tag/digest to deploy instead of this commit
         required: false
         type: string
+      sync_test_customer:
+        description: Reset the controlled b2btest password from the protected staging secret
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: glimo-b2b-staging
@@ -106,6 +111,74 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+
+  sync-test-customer:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_test_customer }}
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: glimo-gateway-staging
+    permissions:
+      contents: read
+    steps:
+      - name: Reset and verify controlled staging customer
+        env:
+          STAGING_ADMIN_ACCESS_TOKEN: ${{ secrets.STAGING_ADMIN_ACCESS_TOKEN }}
+          STAGING_CUSTOMER_PASSWORD: ${{ secrets.STAGING_CUSTOMER_PASSWORD }}
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+        run: |
+          : "${STAGING_ADMIN_ACCESS_TOKEN:?missing staging admin access token}"
+          : "${STAGING_CUSTOMER_PASSWORD:?missing staging customer password}"
+          : "${STAGING_PUBLIC_HEALTH_URL:?missing staging public health URL}"
+
+          base_url="${STAGING_PUBLIC_HEALTH_URL%/api/status}"
+          user_json="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $STAGING_ADMIN_ACCESS_TOKEN" \
+            -H "New-Api-User: 1" \
+            "$base_url/api/user/3")"
+          if [ "$(jq -r '.success' <<<"$user_json")" != true ] || \
+             [ "$(jq -r '.data.username' <<<"$user_json")" != b2btest ] || \
+             [ "$(jq -r '.data.group' <<<"$user_json")" != b2b ]; then
+            echo "Refusing to update an unexpected staging user" >&2
+            exit 1
+          fi
+
+          payload="$(jq -cn --arg password "$STAGING_CUSTOMER_PASSWORD" '{
+            id: 3,
+            username: "b2btest",
+            display_name: "B2B Test Customer",
+            password: $password,
+            group: "b2b",
+            remark: "Controlled B2B payment staging customer"
+          }')"
+          update_json="$(curl --fail-with-body --silent --show-error \
+            -X PUT \
+            -H "Authorization: Bearer $STAGING_ADMIN_ACCESS_TOKEN" \
+            -H "New-Api-User: 1" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "$base_url/api/user/")"
+          if [ "$(jq -r '.success' <<<"$update_json")" != true ]; then
+            echo "Controlled staging customer reset failed" >&2
+            exit 1
+          fi
+
+          login_payload="$(jq -cn --arg password "$STAGING_CUSTOMER_PASSWORD" '{
+            username: "b2btest",
+            password: $password
+          }')"
+          login_json="$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data "$login_payload" \
+            "$base_url/api/user/login")"
+          if [ "$(jq -r '.success' <<<"$login_json")" != true ] || \
+             [ "$(jq -r '.data.id' <<<"$login_json")" != 3 ] || \
+             [ "$(jq -r '.data.group' <<<"$login_json")" != b2b ]; then
+            echo "Controlled staging customer login verification failed" >&2
+            exit 1
+          fi
+
+          echo "Controlled staging customer reset and login verification passed"
 
   deploy:
     if: ${{ inputs.deploy }}
