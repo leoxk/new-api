@@ -345,6 +345,54 @@ refund ID `re_3TuWsX2XeJ21Aojq1ISVMYAQ`, and the audit reason. This completes th
 customer-account Checkout, webhook credit, Stripe refund, local reconciliation
 and dual-balance restoration path.
 
+### Final cancellation, decline, and webhook matrix
+
+The controlled `b2btest` customer completed the remaining hosted Checkout
+negative paths on 2026-07-19 (Asia/Manila):
+
+| Scenario | Provider/system evidence | Result |
+|---|---|---|
+| Customer cancellation | US$20 Stripe-hosted Checkout; customer selected `Back to Glimo Lab Sandbox`; local order `ref_b7030bf30a5286e1256e174dc2fdc81b8b91aace` | Passed; returned to Wallet, order remained pending for later Stripe expiry, and no balance was credited |
+| Card decline | Stripe decline test card `4000 0000 0000 0002`; Checkout displayed `Your credit card was declined. Try paying with a debit card instead.`; local order `ref_cb000b65b5146ee4ac97076e39a0c15966bc8603` | Passed; order remained pending because Checkout was not completed, and no balance was credited |
+
+Before and after both paths, the customer Wallet remained exactly Total US$60,
+Recharge US$35, and Promotional US$25. Billing History retained both US$20
+orders as pending and retained the earlier successful/refunded order with its
+Stripe refund ID. A back-navigation cancellation does not immediately expire a
+Stripe Checkout Session; the signed `checkout.session.expired` webhook performs
+the terminal pending-to-expired transition when Stripe later expires it.
+
+PR `#26` added a deterministic signed-webhook test matrix using Stripe's test
+payload signer. GitHub Actions run `29651630424` passed the full frontend build
+and `go test ./...`, including:
+
+- invalid signature -> HTTP 400 and no credit;
+- completed payment -> one credit even when the same signed event is delivered
+  twice;
+- completed but unpaid -> pending, followed by asynchronous success -> one
+  credit;
+- asynchronous failure -> failed and no credit;
+- Checkout expiry -> expired and no credit;
+- amount mismatch and currency mismatch -> pending and no credit; and
+- minimum top-up boundary -> US$19 rejected and US$20 accepted.
+
+The merged commit was deployed only to the isolated payment staging by workflow
+run `29651710761`. The run passed the frontend/backend verification, immutable
+ARM64 image build, isolated deployment, local health check, public health check,
+authenticated Docs configuration, and credential cleanup. The deployed image
+is `ghcr.io/leoxk/new-api:staging-f777960028fee4859644c814d9f30defea2c9fae`.
+
+Post-deployment customer QA reconfirmed:
+
+- Wallet Total US$60, Recharge US$35, and Promotional US$25;
+- Stripe as the only payment method and US$20 as the minimum/preset;
+- both cancellation/decline orders remained non-credited;
+- `/docs` displayed the approved 10-model private catalog wording, Stripe-only
+  payment rules, promotion-first consumption, manual refund policy, Pilot fee
+  treatment, security guidance, and `contact@glimolab.com`; and
+- at a 390 x 844 viewport, both `/wallet` and `/docs` had document and body
+  scroll widths of exactly 390 px, with no horizontal overflow.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
