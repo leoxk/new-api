@@ -164,6 +164,44 @@ Compose and GitHub Actions workflow no longer inject PayPal credentials, so the
 optional PayPal endpoints remain disabled. Production must expose only Stripe
 Checkout and Stripe refund/reconciliation instructions.
 
+### Stripe-only deployment and provider E2E
+
+PR `#9` removed PayPal credential injection and customer-facing PayPal refund
+wording. Deployment run `29638331255` passed the full Go test suite, frontend
+type-check/build, ARM64 image build, deployment, local/public health checks,
+and ephemeral credential cleanup. Browser verification showed Stripe as the
+only payment method; PayPal was absent.
+
+The first post-deployment visual check found that preset cards still displayed
+the generic Epay rate (`$10` balance / `Pay 73`) even though Stripe's unit price
+and amount API were both `1.0`. PR `#10` made preset cards use
+`stripe_unit_price` whenever Stripe is the active/default method. Deployment
+run `29638720965` passed all jobs. Browser verification then showed `10/10`,
+`25/25`, `50/50`, `100/100`, `250/250`, and `500/500`.
+
+Real Stripe Test Mode provider flows were exercised on 2026-07-18
+(Asia/Manila):
+
+| Scenario | Provider/system evidence | Result |
+|---|---|---|
+| Hosted Checkout success | `$10.00 USD`, test Visa ending `4242`, local order `ref_0fc006502249bc453cd2aa01b8b190958db06552` | Passed; system balance increased from `$200` to `$210` exactly once |
+| Webhook delivery | `checkout.session.completed`, destination response `200` | Passed |
+| Duplicate webhook | The successful delivery was resent from Stripe Workbench | Passed; destination returned success and system balance did not increase again |
+| Customer cancellation | A second hosted Checkout used the Stripe back link before payment | Passed; returned to Wallet and balance remained `$200` after the earlier refund |
+| Card decline | Stripe decline test card produced `Your credit card was declined` | Passed; no balance increase |
+| Provider refund | Full `$10.00 USD` refund, refund ID `re_3TuUQm2XeJ21Aojq1qKEKxNl`, reason `Requested by customer` | Passed; Stripe showed `Refunded` and completed refund events |
+| System refund record | Admin recorded the completed provider refund against the matching local order | Passed; provider refund ID/reason were retained and system balance returned from `$210` to `$200` |
+
+The Stripe test transaction also exposed the expected settlement dimensions:
+the `$10.00 USD` test charge converted to `$78.40 HKD`, showed `$6.98 HKD` in
+processor fees, and a `$71.42 HKD` net amount. These settlement values are
+processor-side reconciliation data and do not change the customer's `1:1` USD
+Recharge Balance.
+
+Only card payments are enabled in the current Stripe product, so a delayed
+payment-method success/failure event is not applicable to the enabled payment
+surface. No Stripe live credential or real payment was used.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
@@ -178,9 +216,10 @@ Checkout and Stripe refund/reconciliation instructions.
 
 - Enable Chrome extension access to file URLs, then upload the approved Glimo
   icon and horizontal logo to the Stripe sandbox branding page.
-- Complete real Stripe sandbox checkout, failure, cancellation, delayed-event,
-  duplicate-event, and refund tests.
 - Create and redeem a real staging redemption code.
+- Repeat the successful Checkout once under the controlled `b2btest` customer
+  instead of the root operator, and archive the final customer-facing receipt
+  view.
 - Do not connect Stripe live credentials or process a real payment until public
   terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
