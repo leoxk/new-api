@@ -228,8 +228,15 @@ console.log(response.choices[0].message.content)`
                 </li>
                 <li>
                   Request a refund or company invoice through Refund & Support
-                  in Wallet. Refunds are reviewed against successful top-ups,
-                  prior refunds, current balance, and usage history.
+                  in Wallet, or email{' '}
+                  <a
+                    href='mailto:contact@glimolab.com?subject=Glimo%20AI%20Gateway%20support%20request'
+                    className='text-primary font-medium underline-offset-4 hover:underline'
+                  >
+                    contact@glimolab.com
+                  </a>
+                  . Refunds are reviewed against successful top-ups, prior
+                  refunds, current balance, and usage history.
                 </li>
                 <li>
                   During the Pilot, Glimo Lab absorbs Stripe's non-refundable
@@ -246,8 +253,14 @@ console.log(response.choices[0].message.content)`
             <CardContent className='space-y-4 text-sm'>
               <p>
                 Usage Logs can be filtered by API key, model, date, status, and
-                request ID. Send the request ID to support, never the full API
-                key.
+                request ID. Send the request ID to{' '}
+                <a
+                  href='mailto:contact@glimolab.com?subject=Glimo%20AI%20Gateway%20support%20request'
+                  className='text-primary font-medium underline-offset-4 hover:underline'
+                >
+                  contact@glimolab.com
+                </a>
+                , never the full API key.
               </p>
               <div className='grid gap-3 sm:grid-cols-2'>
                 <div className='rounded-lg border p-3'>

@@ -349,7 +349,13 @@ export function Wallet(props: WalletProps) {
                   <p>
                     {t(
                       'Contact support to request a refund or company invoice. Payment receipts are provided by the payment processor.'
-                    )}
+                    )}{' '}
+                    <a
+                      href='mailto:contact@glimolab.com?subject=Glimo%20AI%20Gateway%20support%20request'
+                      className='text-primary font-medium underline-offset-4 hover:underline'
+                    >
+                      contact@glimolab.com
+                    </a>
                   </p>
                 </div>
               </section>

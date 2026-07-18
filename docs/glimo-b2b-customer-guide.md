@@ -85,7 +85,7 @@ GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Cata
 
 ## 人工退款
 
-通过支持邮箱提交订单号、付款账号、退款原因和联系人。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。Pilot 阶段经审核批准的退款不会从客户退款金额中扣除原交易的 Stripe 手续费；该费用由 Glimo Lab 承担。
+通过 `contact@glimolab.com` 提交订单号、付款账号、退款原因和联系人；邮件主题建议使用 `Glimo AI Gateway support request`。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。Pilot 阶段经审核批准的退款不会从客户退款金额中扣除原交易的 Stripe 手续费；该费用由 Glimo Lab 承担。
 
 ## 用量与排错
 
@@ -100,4 +100,4 @@ Usage Logs 可按 API Key、模型、日期、状态和 request ID 查询。联�
 
 ## 支持范围
 
-本服务面向已批准 B2B 客户，不开放消费者自助注册获客。支持联系方式以控制台 `Refund & Support` 区域公布的信息为准。
+本服务面向已批准 B2B 客户，不开放消费者自助注册获客。支持邮箱为 `contact@glimolab.com`，控制台 `Refund & Support` 和登录后 Customer Guide 均提供可点击入口。
