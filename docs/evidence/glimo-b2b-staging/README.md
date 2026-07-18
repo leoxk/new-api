@@ -220,11 +220,86 @@ updated through the authenticated admin UI:
 The production value remains unchanged pending the separate production canary
 approval.
 
+### Controlled customer credential sync
+
+PR `#14` added a manual, staging-only account sync job after the admin UI
+password update failed validation during customer-account handoff. The job
+first verifies that user ID 3 is exactly `b2btest` in group `b2b`, then resets
+its password from the protected `STAGING_CUSTOMER_PASSWORD` GitHub Environment
+Secret and verifies the public login response. It does not build or deploy an
+image and cannot target production.
+
+Workflow run `29640598209` passed the complete Go/frontend verification and the
+controlled customer reset/login check. Image and deployment jobs were skipped.
+No password was printed or persisted on the staging host; the short-lived local
+handoff file was deleted immediately after the browser session received it.
+
+### Real redemption and dual-balance correction
+
+The ordinary `b2btest` customer redeemed a real one-time staging code for
+US$25, expiring after one month. The first live result exposed an accounting
+classification defect:
+
+| Stage | Total | Recharge | Promotional | Result |
+|---|---:|---:|---:|---|
+| Before redemption | $35 | $35 | $0 | Baseline |
+| Before fix | $60 | $60 | $0 | Incorrect: new redemption was classified as cash |
+| After fix | $60 | $35 | $25 | Passed |
+
+The root cause was the original shortcut `min(total quota, historical net
+cash)`: after earlier cash consumption, historical cash funding remained above
+the current total and hid a later promotional grant. PR `#15` retained
+`users.quota` as the only spendable balance and added one lightweight field to
+the existing `redemptions` table: the user's cumulative used quota at the time
+of redemption. Remaining promotion is now calculated in redemption order from
+the deltas between those snapshots. No wallet or ledger table was added.
+
+The same calculation now controls completed-refund validation, so the US$25
+Promotional Credit is excluded from the customer's refundable balance. The
+legacy staging migration conservatively excludes older redeemed fixtures and
+retains only the newest pre-migration B2B redemption as potentially
+unconsumed. Non-B2B users are not changed.
+
+Deployment run `29641242002` passed the full Go suite, frontend type-check and
+build, ARM64 image build, isolated staging deployment, database migration,
+local/public health checks, and ephemeral credential cleanup. The deployed
+image is `ghcr.io/leoxk/new-api:staging-57ec51ed3e5e725d25978ff9f5da125c603c7037`.
+
+### Ordinary customer visual audit
+
+The authenticated `b2btest` session confirmed:
+
+- Wallet shows Total, Recharge, Promotional, Total Usage, API Requests, Stripe
+  top-up, Redemption Code, Order History, and Refund & Support.
+- Stripe is the only visible payment method; PayPal is absent.
+- The sidebar has no Admin section, Referral Program, Subscription Plans, or
+  Check-in Rewards.
+- The API key remains enabled with group `Auto` and its secret is masked.
+- The Wallet correctly explains promotion-first consumption, non-refundable
+  and non-transferable Promotional Credit, manual Recharge Balance review, and
+  processor receipts.
+
+Two customer-experience gaps remain visible:
+
+- The payment-only staging Model Square contains zero configured model
+  metadata, so the ten-model commercial catalog cannot be visually accepted in
+  this isolated environment.
+- The API Keys table says `Models: Unlimited`. Actual access is still governed
+  by the B2B user group and `auto` routing, but the wording is misleading and
+  should be replaced with an approved-catalog description before customer
+  canary.
+- Model Square exposes the internal group labels and ratios (`b2b x0.1` and
+  `b2b-deepseek x1.1`) in its filter. Customer-facing catalog copy must describe
+  effective prices without revealing internal routing groups.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
 - `customer-wallet-mobile.png`
 - `customer-api-keys-desktop.png`
+- `customer-wallet-promo-after-redemption.png`
+- `customer-wallet-stripe-redemption-support.png`
+- `customer-model-square-empty.png`
 - `admin-users-desktop.png`
 - `admin-order-refund-history.png`
 - `admin-refund-form.png`
@@ -232,12 +307,12 @@ approval.
 
 ## Remaining external gates
 
-- Enable Chrome extension access to file URLs, then upload the approved Glimo
-  icon and horizontal logo to the Stripe sandbox branding page.
-- Create and redeem a real staging redemption code.
 - Repeat the successful Checkout once under the controlled `b2btest` customer
   instead of the root operator, and archive the final customer-facing receipt
   view.
+- Validate the ten-model catalog, hide internal group labels/ratios, and replace
+  the misleading `Models: Unlimited` wording in an environment that contains
+  the approved B2B model metadata.
 - Do not connect Stripe live credentials or process a real payment until public
   terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
