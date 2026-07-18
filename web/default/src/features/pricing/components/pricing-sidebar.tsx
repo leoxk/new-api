@@ -252,7 +252,9 @@ export function PricingSidebar(props: PricingSidebarProps) {
         <div>
           <h2 className='text-foreground text-sm font-bold'>{t('Filter')}</h2>
           <p className='text-muted-foreground mt-1 text-xs'>
-            {t('Refine models by provider, group, type, and tags.')}
+            {props.showInternalGroups !== false
+              ? t('Refine models by provider, group, type, and tags.')
+              : t('Filter models by provider, type, endpoint, and tags.')}
           </p>
         </div>
         <Button
