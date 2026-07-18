@@ -45,6 +45,7 @@ import {
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
+  isStripePayment,
   isWaffoPancakePayment,
 } from './lib'
 import type {
@@ -87,6 +88,16 @@ export function Wallet(props: WalletProps) {
       ? 1
       : currency?.usdExchangeRate || 1
   }, [currency?.quotaDisplayType, currency?.usdExchangeRate])
+  const presetPriceRatio = useMemo(() => {
+    const paymentType =
+      selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
+
+    if (isStripePayment(paymentType)) {
+      return Number(status?.stripe_unit_price) || 1
+    }
+
+    return Number(status?.price) || 1
+  }, [selectedPaymentMethod?.type, status, topupInfo])
   const {
     amount: paymentAmount,
     calculating,
@@ -293,7 +304,7 @@ export function Wallet(props: WalletProps) {
                   redeeming={redeeming}
                   topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
-                  priceRatio={(status?.price as number) || 1}
+                  priceRatio={presetPriceRatio}
                   usdExchangeRate={effectiveUsdExchangeRate}
                   onOpenBilling={() => setBillingDialogOpen(true)}
                   creemProducts={topupInfo?.creem_products}
