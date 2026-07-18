@@ -120,7 +120,7 @@ export function AppHeader({
         ) : null}
 
         {rightContent ?? (
-          <div className='ms-auto flex items-center gap-1 sm:gap-2'>
+          <div className='ms-auto flex min-w-0 items-center gap-1 sm:gap-2'>
             {showTopNav && (
               <div className='me-1 hidden lg:block'>
                 <TopNav links={links} />
@@ -128,19 +128,27 @@ export function AppHeader({
             )}
             {showSearch && <Search />}
             {showNotifications && (
-              <NotificationPopover
-                open={notifications.popoverOpen}
-                onOpenChange={notifications.setPopoverOpen}
-                unreadCount={notifications.unreadCount}
-                activeTab={notifications.activeTab}
-                onTabChange={notifications.setActiveTab}
-                notice={notifications.notice}
-                announcements={notifications.announcements}
-                loading={notifications.loading}
-              />
+              <div className='hidden sm:block'>
+                <NotificationPopover
+                  open={notifications.popoverOpen}
+                  onOpenChange={notifications.setPopoverOpen}
+                  unreadCount={notifications.unreadCount}
+                  activeTab={notifications.activeTab}
+                  onTabChange={notifications.setActiveTab}
+                  notice={notifications.notice}
+                  announcements={notifications.announcements}
+                  loading={notifications.loading}
+                />
+              </div>
             )}
-            <LanguageSwitcher />
-            {showConfigDrawer && <ConfigDrawer />}
+            <div className='hidden sm:block'>
+              <LanguageSwitcher />
+            </div>
+            {showConfigDrawer && (
+              <div className='hidden sm:block'>
+                <ConfigDrawer />
+              </div>
+            )}
             {showProfileDropdown && <ProfileDropdown />}
           </div>
         )}
