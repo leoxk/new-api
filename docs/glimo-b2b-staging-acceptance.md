@@ -26,6 +26,17 @@
 6. 覆盖只有现金、只有促销、混合余额、部分消费、全额/部分人工退款和重复退款登记；Pilot 退款不从客户金额中扣除 Stripe 原交易手续费。
 7. 确认默认用户、生产 DeepSeek channel 和现有客户分组不变。
 
+## 2026-07-19 支付矩阵完成记录
+
+- Stripe 托管 Checkout 成功、客户返回取消、测试卡拒付、Stripe 原路全额退款均已通过真实 Sandbox 客户路径。
+- 取消订单 `ref_b7030bf30a5286e1256e174dc2fdc81b8b91aace` 和拒付订单 `ref_cb000b65b5146ee4ac97076e39a0c15966bc8603` 均未入账；两次流程前后余额保持 Total US$60、Recharge US$35、Promotional US$25。
+- PR `#26` 的签名 webhook 自动矩阵覆盖：无效签名、重复成功事件、延迟成功、异步失败、过期、金额不符、币种不符，以及 US$19/US$20 最低充值边界。
+- PR 验证 run `29651630424` 已通过完整前端构建和 `go test ./...`。
+- staging 部署 run `29651710761` 已通过不可变 ARM64 镜像构建、独立环境部署、本机/公网健康检查、客户 Docs 配置和临时凭证清理；镜像为 `ghcr.io/leoxk/new-api:staging-f777960028fee4859644c814d9f30defea2c9fae`。
+- 部署后 Wallet、Billing History、`/docs` 和支持邮箱均已复核；390 x 844 视口下 Wallet 与 Docs 的页面宽度均为 390 px，无横向溢出。
+
+支付专用 staging 的验收范围已经闭环。10 模型真实调用、实际路由和价格扣费仍属于独立模型集成环境或获批生产 canary，不得在没有上游凭据的支付 staging 中伪造完成。
+
 ## 发布门禁
 
 必须附上测试日志、截图、价格映射和回滚演练结果，由 Leo 单独批准商户账号、生产支付凭证、最终价格、生产 canary、真实付款与退款。未经批准，workflow 只允许 staging 环境。
