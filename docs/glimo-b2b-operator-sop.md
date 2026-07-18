@@ -60,6 +60,8 @@ Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`ST
 
 Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不足，先暂停账号并由负责人决定追偿或坏账处理，禁止把余额扣成负数。
 
+支付 staging 无需把管理员 token 放入浏览器或本机。Stripe Sandbox 已完成退款后，可手工触发 `Glimo B2B staging operations` workflow；该 job 只接受 `re_...` 退款 ID，并在登记前验证订单属于受控 `b2btest`、状态成功、支付方式为 Stripe、尚未退款且金额未超出订单。此入口不能用于生产。
+
 ## 路由和异常处理
 
 - GPT/GPT Image 应记录实际 group=`b2b`、group ratio=`0.1`。
