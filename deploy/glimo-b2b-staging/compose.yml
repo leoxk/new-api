@@ -22,10 +22,6 @@ services:
       STRIPE_API_SECRET: ${STRIPE_API_SECRET:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
-      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
-      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
-      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
-      PAYPAL_WEBHOOK_ID: ${PAYPAL_WEBHOOK_ID:-}
     depends_on:
       postgres:
         condition: service_healthy

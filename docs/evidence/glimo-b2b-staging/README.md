@@ -155,6 +155,15 @@ and intercompany arrangement are separately reviewed and approved. The preferred
 production path is a separate PayPal Business account for `KL Merchandise
 Limited`, with Glimo Lab as the customer-facing business name.
 
+### Stripe-only scope update
+
+On 2026-07-18 Leo narrowed the Glimo Lab commercial payment scope to Stripe
+only. The PayPal sandbox notes above remain as historical evidence of the
+earlier evaluation; they are not an active rollout requirement. The staging
+Compose and GitHub Actions workflow no longer inject PayPal credentials, so the
+optional PayPal endpoints remain disabled. Production must expose only Stripe
+Checkout and Stripe refund/reconciliation instructions.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
@@ -169,11 +178,10 @@ Limited`, with Glimo Lab as the customer-facing business name.
 
 - Enable Chrome extension access to file URLs, then upload the approved Glimo
   icon and horizontal logo to the Stripe sandbox branding page.
-- Complete real Stripe and PayPal sandbox checkout, failure, cancellation,
-  delayed-event, duplicate-event, and refund tests.
+- Complete real Stripe sandbox checkout, failure, cancellation, delayed-event,
+  duplicate-event, and refund tests.
 - Create and redeem a real staging redemption code.
-- Do not activate a Stripe live account or create/use a PayPal production
-  merchant account until merchant identity, public terms, final pricing, and
-  canary approval are complete.
+- Do not connect Stripe live credentials or process a real payment until public
+  terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
   user, or DeepSeek channel was changed.

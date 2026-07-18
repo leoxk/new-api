@@ -424,7 +424,7 @@ export function BillingHistoryDialog({
             <AlertDialogTitle>{t('Record Completed Refund')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t(
-                'Use this only after the refund has completed in Stripe or PayPal. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.'
+                'Use this only after the refund has completed in Stripe. This action records the provider refund and deducts the same amount from Recharge Balance; it does not send money.'
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
