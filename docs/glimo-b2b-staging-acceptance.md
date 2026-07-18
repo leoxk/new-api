@@ -1,5 +1,12 @@
 # Glimo AI Gateway staging 验收与回滚
 
+## 环境边界
+
+- `staging-llm.glimolab.com` 是支付专用 staging：独立 PostgreSQL、Redis、容器、网络和 volumes，只验证 Stripe、Wallet、兑换码、退款登记及客户/运营界面。
+- 支付 staging 不注入生产 channel、上游密钥或伪造 abilities。Model Square 显示 0 models 属于环境边界，不代表生产目录为空。
+- 10 模型的成功调用、真实 endpoint、路由倍率和扣费验收必须在另一个具有独立测试上游凭据的集成环境完成，或在单独批准的生产 canary 中完成。
+- 不得为了让支付 staging 的目录“看起来完整”而创建不可调用的假 channel；这会产生错误的客户预期。
+
 ## 验收证据
 
 - 受控客户账号：group=`b2b`、初始 quota=0、API Key group=`auto`。
@@ -8,6 +15,8 @@
 - 管理员桌面端与移动端截图：客户分组、ability、充值订单、退款登记、审计日志和用量筛选。
 
 ## 自动与人工测试矩阵
+
+以下矩阵分为支付 staging 与模型集成环境两部分。支付 staging 完成第 4 至第 7 项及界面验证；模型集成环境完成第 1 至第 3 项：
 
 1. 10 个批准模型各完成一次成功调用，记录 request ID、实际路由组、倍率和扣费。
 2. `codex-auto-review`、`dall-e-3` 和一个任意未批准模型返回 model-not-available，且无 default 回退。

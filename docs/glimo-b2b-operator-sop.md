@@ -23,7 +23,7 @@
 
 ## 价格复核
 
-支付启用前，由第二名复核人逐项签字确认：
+支付启用前逐项复核并保存证据；任何生产价格变更仍须 Leo 明确批准：
 
 - 6 个 GPT 文本/推理模型只采用 OpenAI Standard / Short context；input、cached input、cache write、output、reasoning 分别核对，最终有效倍率为 `0.1`。
 - 2 个 DeepSeek 模型的 base rate 分别等于官方 cache hit、cache miss/input、output 价格，再应用内部组 `b2b-deepseek=1.10`，用于覆盖税费和支付成本。
@@ -50,13 +50,13 @@ Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`ST
 ## 人工退款
 
 1. 收到申请后冻结该笔退款处理，导出客户成功充值、历史退款和完整 Usage Logs。
-2. 按“Promotional Credit 优先消费”计算：`Recharge Balance = min(users.quota, 成功现金充值 - 已登记退款 - 已确认 chargeback)`。
-3. 复核退款金额不超过原订单金额且不超过当前 Recharge Balance。
-4. 经第二人批准后，在 Stripe 原路退款。
+2. 以 Wallet 当前显示的 Recharge Balance 为系统退款上限。系统仍只扣减 `users.quota`，但 Promotional Credit 使用兑换记录中的 `used_quota_at_redemption` 快照按兑换顺序推导，不能再用 `min(users.quota, 历史净现金充值)` 作为唯一算法。
+3. 同时导出成功充值、兑换码、历史退款和 Usage Logs 做人工复核；如显示余额与人工记录不一致，暂停退款并升级调查，不要通过直接改 quota 强行对平。
+4. 复核退款金额不超过原订单未退金额且不超过当前 Recharge Balance，然后在 Stripe 原路退款。Pilot 的真实退款必须经过授权人员人工确认；争议、chargeback 或金额异常时升级给 Leo。
 5. 只有处理器显示完成后，管理员在 Billing History 选择 `Record Completed Refund`，填写处理器 refund ID、金额和原因。
 6. 确认系统在一次事务中写入退款字段并扣除等额 quota；核对 Total = Recharge + Promotional。
 7. Pilot 阶段不得从客户退款金额中扣除 Stripe 不退还的原交易手续费；将该手续费记录为 Glimo Lab 支付成本。
-8. 保存处理器凭证、审计日志和客户通知。不得用此按钮发起支付处理器退款。
+8. 保存处理器凭证、审计日志和客户通知。不得用此按钮发起支付处理器退款，也不得手工回写 `users.quota`、`used_quota` 或兑换快照。
 
 Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不足，先暂停账号并由负责人决定追偿或坏账处理，禁止把余额扣成负数。
 
