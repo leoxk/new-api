@@ -312,6 +312,39 @@ mobile acceptance confirmed that both the sidebar and mobile filter drawer say
 `Filter models by provider, type, endpoint, and tags.` and expose no internal
 group controls or ratios.
 
+### Controlled B2B customer Stripe top-up and refund
+
+The ordinary `b2btest` customer completed a second real Stripe Test Mode flow
+on 2026-07-18, this time through the customer account rather than an operator
+account:
+
+| Stage | Total | Recharge | Promotional | Evidence |
+|---|---:|---:|---:|---|
+| Before Checkout | $60 | $35 | $25 | Customer Wallet baseline |
+| After US$20 Checkout | $80 | $55 | $25 | 1:1 cash credit; promotion unchanged |
+| After provider and local refund | $60 | $35 | $25 | Original balance restored |
+
+- New API order: `ref_439fa9bbec51995d68554295f217b912bc341dc3`
+- Stripe Payment Intent: `pi_3TuWsX2XeJ21Aojq1YRflD66`
+- Stripe Sandbox refund: `re_3TuWsX2XeJ21Aojq1ISVMYAQ`
+- Test customer: `b2btest@example.com`; test Visa ending `4242`
+- Stripe status: US$20 payment succeeded, then US$20 refund succeeded with
+  reason `requested_by_customer`
+- Settlement evidence: US$20 = HK$156.81, original fee HK$11.61, refund
+  HK$156.80, net impact `-HK$11.60`
+
+The Stripe refund was recorded locally by the staging-only `Glimo B2B staging
+operations` workflow run `29643794763`. Before calling the existing transactional
+refund endpoint, the workflow verified the exact order, controlled customer ID
+3, Stripe payment method, success status, unrefunded state, amount and `re_...`
+provider ID. The protected admin token remained in the GitHub Environment and
+was not copied to the browser, workstation or repository.
+
+The customer Billing History then displayed `Recorded Refund: 20`, provider
+refund ID `re_3TuWsX2XeJ21Aojq1ISVMYAQ`, and the audit reason. This completes the
+customer-account Checkout, webhook credit, Stripe refund, local reconciliation
+and dual-balance restoration path.
+
 ## Screenshots
 
 - `customer-wallet-desktop.png`
@@ -321,6 +354,8 @@ group controls or ratios.
 - `customer-wallet-stripe-redemption-support.png`
 - `customer-model-square-empty.png`
 - `customer-model-square-mobile-filter.png`
+- `customer-stripe-topup-refund-history.png`
+- `stripe-b2b-customer-refund.png`
 - `admin-users-desktop.png`
 - `admin-order-refund-history.png`
 - `admin-refund-form.png`
@@ -328,12 +363,11 @@ group controls or ratios.
 
 ## Remaining external gates
 
-- Repeat the successful Checkout once under the controlled `b2btest` customer
-  instead of the root operator, and archive the final customer-facing receipt
-  view.
 - Validate the ten-model cards, endpoints, and effective prices in an
   environment that contains the approved B2B model metadata. Internal group
   labels/ratios and the misleading model-limit wording are already resolved.
+- Replace the customer-facing Docs link to `docs.newapi.pro` with a Glimo-hosted
+  private customer guide before production canary.
 - Do not connect Stripe live credentials or process a real payment until public
   terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
