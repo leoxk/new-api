@@ -366,9 +366,13 @@ and dual-balance restoration path.
 - Validate the ten-model cards, endpoints, and effective prices in an
   environment that contains the approved B2B model metadata. Internal group
   labels/ratios and the misleading model-limit wording are already resolved.
-- Replace the customer-facing Docs link to `docs.newapi.pro` with a Glimo-hosted
-  private customer guide before production canary.
 - Do not connect Stripe live credentials or process a real payment until public
   terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
   user, or DeepSeek channel was changed.
+
+The former upstream Docs-link gate is complete. Payment staging now clears the
+external `docs_link` during GitHub Actions deployment and routes signed-in users
+to the authenticated `/docs` customer guide. Desktop and 390 px mobile checks
+passed without horizontal page overflow; the guide and Wallet support section
+use the established Glimo Lab address `contact@glimolab.com`.
