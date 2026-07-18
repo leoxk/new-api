@@ -24,6 +24,11 @@ to `http://localhost:3100`. GitHub Actions deploys directly to the public VPS
 SSH hostname with a project-specific SSH key, a pinned host key, and strict host
 key checking. A Cloudflare Access Service Token is not required for deployment.
 
+After each deployment, the workflow uses the protected staging admin token to
+clear `general_setting.docs_link`. Signed-in customers are therefore routed to
+the built-in authenticated `/docs` guide instead of the upstream New API site.
+The token is used ephemerally by GitHub Actions and is not copied to the host.
+
 ## Runtime variables
 
 The protected GitHub Environment secret `STAGING_RUNTIME_ENV` supplies:

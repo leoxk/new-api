@@ -246,6 +246,33 @@ jobs:
           STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
         run: curl --fail --silent --show-error "$STAGING_PUBLIC_HEALTH_URL"
 
+      - name: Configure authenticated customer documentation
+        env:
+          STAGING_ADMIN_ACCESS_TOKEN: ${{ secrets.STAGING_ADMIN_ACCESS_TOKEN }}
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+        run: |
+          : "${STAGING_ADMIN_ACCESS_TOKEN:?missing staging admin access token}"
+          : "${STAGING_PUBLIC_HEALTH_URL:?missing staging public health URL}"
+          base_url="${STAGING_PUBLIC_HEALTH_URL%/api/status}"
+          result="$(curl --fail-with-body --silent --show-error \
+            -X PUT \
+            -H "Authorization: Bearer $STAGING_ADMIN_ACCESS_TOKEN" \
+            -H "New-Api-User: 1" \
+            -H "Content-Type: application/json" \
+            --data '{"key":"general_setting.docs_link","value":""}' \
+            "$base_url/api/option/")"
+          if [ "$(jq -r '.success' <<<"$result")" != true ]; then
+            echo "Failed to configure the staging customer documentation route" >&2
+            exit 1
+          fi
+          status="$(curl --fail-with-body --silent --show-error \
+            "$STAGING_PUBLIC_HEALTH_URL")"
+          if [ -n "$(jq -r '.data.docs_link // empty' <<<"$status")" ]; then
+            echo "Staging still exposes an external documentation link" >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error "$base_url/docs" >/dev/null
+
       - name: Remove ephemeral credentials
         if: always()
         run: |
