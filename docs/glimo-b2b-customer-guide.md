@@ -1,6 +1,6 @@
 # Glimo AI Gateway B2B 客户指南
 
-> 服务阶段：Best-effort Pilot，不承诺固定 SLA。客户账号须经 Glimo Lab 审批并手工加入 `b2b` 组。
+> 服务阶段：Best-effort Pilot，不承诺固定 SLA。客户账号须经 Glimo Lab 审批后开通；客户不需要了解或选择内部路由组。
 
 ## 快速开始
 
@@ -45,6 +45,21 @@ const response = await client.chat.completions.create({
 })
 console.log(response.choices[0].message.content)
 ```
+
+如登录后的 Model Catalog 将目标 GPT 模型标记为支持 Responses API，也可直接调用：
+
+```bash
+curl https://llm.glimolab.com/v1/responses \
+  -H "Authorization: Bearer $GLIMO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.6-sol",
+    "input": "Summarize the benefits of prepaid B2B API billing."
+  }'
+```
+
+endpoint 以登录后的 Model Catalog 为准：文本模型通常使用
+`/v1/chat/completions`，已标记的 GPT 模型也可使用 `/v1/responses`；图像生成和编辑分别使用目录中已验证的 `/v1/images/generations` 与 `/v1/images/edits`。未在目录中标记的 endpoint 不属于承诺范围。
 
 GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Catalog 中标记为已验证的项目为准。不要假设上游支持但目录未标记的组合可用。
 
