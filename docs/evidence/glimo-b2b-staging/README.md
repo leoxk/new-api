@@ -279,18 +279,38 @@ The authenticated `b2btest` session confirmed:
   and non-transferable Promotional Credit, manual Recharge Balance review, and
   processor receipts.
 
-Two customer-experience gaps remain visible:
+The payment-only staging Model Square still contains zero configured model
+metadata, so the ten-model commercial catalog itself cannot be visually
+accepted in this isolated environment. The two customer-facing defects found
+during the audit were subsequently corrected and accepted as described below.
 
-- The payment-only staging Model Square contains zero configured model
-  metadata, so the ten-model commercial catalog cannot be visually accepted in
-  this isolated environment.
-- The API Keys table says `Models: Unlimited`. Actual access is still governed
-  by the B2B user group and `auto` routing, but the wording is misleading and
-  should be replaced with an approved-catalog description before customer
-  canary.
-- Model Square exposes the internal group labels and ratios (`b2b x0.1` and
-  `b2b-deepseek x1.1`) in its filter. Customer-facing catalog copy must describe
-  effective prices without revealing internal routing groups.
+### Customer catalog privacy and API-key wording
+
+PR `#17` changed the customer-facing Model Square and API Keys table without
+changing routing or price calculation:
+
+- Ordinary customers and unauthenticated visitors no longer see internal group
+  filters, group names, group ratios, the table Groups column, model-card group
+  labels, or group-pricing details.
+- Administrators retain the internal group and ratio views used for operations.
+- A manually supplied group query parameter is ignored when internal groups are
+  hidden.
+- A B2B customer's `auto` API key now shows `Models: Approved catalog` instead
+  of `Models: Unlimited`. The separate `Quota: Unlimited` label remains correct:
+  it means that the individual key has no quota cap and does not grant access to
+  unapproved models.
+
+Deployment run `29642382691` passed the full frontend/backend verification,
+immutable ARM64 image build, isolated staging deployment, local/public health
+checks, and cleanup. Desktop browser acceptance confirmed that the customer
+page contained none of `b2b x0.1`, `b2b-deepseek x1.1`, or the Groups filter.
+
+That acceptance pass found one remaining generic sentence mentioning group.
+PR `#18` removed that wording for customers while preserving the administrator
+copy. Deployment run `29642749771` passed all jobs. Final desktop and 390x844
+mobile acceptance confirmed that both the sidebar and mobile filter drawer say
+`Filter models by provider, type, endpoint, and tags.` and expose no internal
+group controls or ratios.
 
 ## Screenshots
 
@@ -300,6 +320,7 @@ Two customer-experience gaps remain visible:
 - `customer-wallet-promo-after-redemption.png`
 - `customer-wallet-stripe-redemption-support.png`
 - `customer-model-square-empty.png`
+- `customer-model-square-mobile-filter.png`
 - `admin-users-desktop.png`
 - `admin-order-refund-history.png`
 - `admin-refund-form.png`
@@ -310,9 +331,9 @@ Two customer-experience gaps remain visible:
 - Repeat the successful Checkout once under the controlled `b2btest` customer
   instead of the root operator, and archive the final customer-facing receipt
   view.
-- Validate the ten-model catalog, hide internal group labels/ratios, and replace
-  the misleading `Models: Unlimited` wording in an environment that contains
-  the approved B2B model metadata.
+- Validate the ten-model cards, endpoints, and effective prices in an
+  environment that contains the approved B2B model metadata. Internal group
+  labels/ratios and the misleading model-limit wording are already resolved.
 - Do not connect Stripe live credentials or process a real payment until public
   terms, final pricing, staging evidence, and canary approval are complete.
 - No production merchant account, credential, payment, refund, price, balance,
