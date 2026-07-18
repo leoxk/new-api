@@ -82,22 +82,76 @@ func getUserNetCashQuota(tx *gorm.DB, userId int) (int, error) {
 	return quota, nil
 }
 
-func GetUserWalletBalance(userId int, totalQuota int) (WalletBalance, error) {
+func getTrackedPromotionalQuota(tx *gorm.DB, userId int, totalQuota int) (int, error) {
+	var user User
+	if err := tx.Select("id", "used_quota").First(&user, userId).Error; err != nil {
+		return 0, err
+	}
+
+	var redemptions []Redemption
+	if err := tx.Where(
+		"used_user_id = ? AND status = ? AND used_quota_at_redemption >= 0",
+		userId, common.RedemptionCodeStatusUsed,
+	).Order("redeemed_time asc, id asc").Find(&redemptions).Error; err != nil {
+		return 0, err
+	}
+	if len(redemptions) == 0 {
+		return 0, nil
+	}
+
+	var promotional int64
+	lastUsedQuota := redemptions[0].UsedQuotaAtRedemption
+	for _, redemption := range redemptions {
+		if redemption.UsedQuotaAtRedemption > lastUsedQuota {
+			consumed := int64(redemption.UsedQuotaAtRedemption - lastUsedQuota)
+			promotional -= consumed
+			if promotional < 0 {
+				promotional = 0
+			}
+			lastUsedQuota = redemption.UsedQuotaAtRedemption
+		}
+		promotional += int64(redemption.Quota)
+	}
+	if user.UsedQuota > lastUsedQuota {
+		promotional -= int64(user.UsedQuota - lastUsedQuota)
+	}
+	if promotional < 0 {
+		promotional = 0
+	}
+	if promotional > int64(totalQuota) {
+		promotional = int64(totalQuota)
+	}
+	return int(promotional), nil
+}
+
+func getUserWalletBalance(tx *gorm.DB, userId int, totalQuota int) (WalletBalance, error) {
 	if totalQuota < 0 {
 		totalQuota = 0
 	}
-	netCashQuota, err := getUserNetCashQuota(DB, userId)
+	netCashQuota, err := getUserNetCashQuota(tx, userId)
 	if err != nil {
 		return WalletBalance{}, err
 	}
-	rechargeQuota := netCashQuota
-	if rechargeQuota > totalQuota {
-		rechargeQuota = totalQuota
+	trackedPromotionalQuota, err := getTrackedPromotionalQuota(tx, userId, totalQuota)
+	if err != nil {
+		return WalletBalance{}, err
+	}
+	legacyPromotionalQuota := totalQuota - netCashQuota
+	if legacyPromotionalQuota < 0 {
+		legacyPromotionalQuota = 0
+	}
+	promotionalQuota := trackedPromotionalQuota
+	if legacyPromotionalQuota > promotionalQuota {
+		promotionalQuota = legacyPromotionalQuota
 	}
 	return WalletBalance{
-		RechargeQuota:    rechargeQuota,
-		PromotionalQuota: totalQuota - rechargeQuota,
+		RechargeQuota:    totalQuota - promotionalQuota,
+		PromotionalQuota: promotionalQuota,
 	}, nil
+}
+
+func GetUserWalletBalance(userId int, totalQuota int) (WalletBalance, error) {
+	return getUserWalletBalance(DB, userId, totalQuota)
 }
 
 func RecordCompletedTopUpRefund(tradeNo string, refundedMoney decimal.Decimal, providerRefundId string, reason string) (*TopUp, error) {
@@ -132,19 +186,15 @@ func RecordCompletedTopUpRefund(tradeNo string, refundedMoney decimal.Decimal, p
 		if err := lockForUpdate(tx).Where("id = ?", refundedTopUp.UserId).First(&user).Error; err != nil {
 			return err
 		}
-		netCashQuota, err := getUserNetCashQuota(tx, refundedTopUp.UserId)
+		walletBalance, err := getUserWalletBalance(tx, refundedTopUp.UserId, user.Quota)
 		if err != nil {
 			return err
-		}
-		rechargeQuota := netCashQuota
-		if rechargeQuota > user.Quota {
-			rechargeQuota = user.Quota
 		}
 		refundedQuota, clamp := common.QuotaFromDecimalChecked(refundedMoney.Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
 		if clamp != nil {
 			return ErrRefundExceedsRechargeBalance
 		}
-		if refundedQuota > rechargeQuota {
+		if refundedQuota > walletBalance.RechargeQuota {
 			return ErrRefundExceedsRechargeBalance
 		}
 

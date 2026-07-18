@@ -12,18 +12,69 @@ import (
 )
 
 type Redemption struct {
-	Id           int            `json:"id"`
-	UserId       int            `json:"user_id"`
-	Key          string         `json:"key" gorm:"type:char(32);uniqueIndex"`
-	Status       int            `json:"status" gorm:"default:1"`
-	Name         string         `json:"name" gorm:"index"`
-	Quota        int            `json:"quota" gorm:"default:100"`
-	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
-	RedeemedTime int64          `json:"redeemed_time" gorm:"bigint"`
-	Count        int            `json:"count" gorm:"-:all"` // only for api request
-	UsedUserId   int            `json:"used_user_id"`
-	DeletedAt    gorm.DeletedAt `gorm:"index"`
-	ExpiredTime  int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	Id                    int            `json:"id"`
+	UserId                int            `json:"user_id"`
+	Key                   string         `json:"key" gorm:"type:char(32);uniqueIndex"`
+	Status                int            `json:"status" gorm:"default:1"`
+	Name                  string         `json:"name" gorm:"index"`
+	Quota                 int            `json:"quota" gorm:"default:100"`
+	CreatedTime           int64          `json:"created_time" gorm:"bigint"`
+	RedeemedTime          int64          `json:"redeemed_time" gorm:"bigint"`
+	UsedQuotaAtRedemption int            `json:"-" gorm:"not null;default:-1;column:used_quota_at_redemption"`
+	Count                 int            `json:"count" gorm:"-:all"` // only for api request
+	UsedUserId            int            `json:"used_user_id"`
+	DeletedAt             gorm.DeletedAt `gorm:"index"`
+	ExpiredTime           int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+}
+
+const ignoredLegacyRedemptionUsageSnapshot = -2
+
+// backfillB2BRedemptionUsageSnapshots handles the controlled B2B pilot data
+// created before usage snapshots existed. Only the newest legacy redemption is
+// considered potentially unconsumed; older legacy rows stay excluded to avoid
+// overstating non-refundable credit.
+func backfillB2BRedemptionUsageSnapshots() error {
+	var userIDs []int
+	if err := DB.Model(&Redemption{}).
+		Where("status = ? AND used_user_id > 0 AND used_quota_at_redemption = ?", common.RedemptionCodeStatusUsed, -1).
+		Distinct("used_user_id").
+		Pluck("used_user_id", &userIDs).Error; err != nil {
+		return err
+	}
+
+	for _, userID := range userIDs {
+		if err := DB.Transaction(func(tx *gorm.DB) error {
+			var user User
+			if err := lockForUpdate(tx).Select("id", "group", "used_quota").First(&user, userID).Error; err != nil {
+				return err
+			}
+			if user.Group != "b2b" {
+				return nil
+			}
+
+			var legacy []Redemption
+			if err := tx.Where(
+				"status = ? AND used_user_id = ? AND used_quota_at_redemption = ?",
+				common.RedemptionCodeStatusUsed, userID, -1,
+			).Order("redeemed_time asc, id asc").Find(&legacy).Error; err != nil {
+				return err
+			}
+			for i := range legacy {
+				snapshot := ignoredLegacyRedemptionUsageSnapshot
+				if i == len(legacy)-1 {
+					snapshot = user.UsedQuota
+				}
+				if err := tx.Model(&Redemption{}).Where("id = ?", legacy[i].Id).
+					Update("used_quota_at_redemption", snapshot).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -159,15 +210,20 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
+		var user User
+		if err := lockForUpdate(tx).Select("id", "used_quota").First(&user, userId).Error; err != nil {
+			return err
+		}
 		// Compare-and-swap on status: only the transaction that flips
 		// enabled -> used may credit quota, so a concurrent redeem of the
 		// same code loses here even without a row lock (e.g. on SQLite).
 		result := tx.Model(&Redemption{}).
 			Where("id = ? AND status = ?", redemption.Id, common.RedemptionCodeStatusEnabled).
 			Updates(map[string]interface{}{
-				"redeemed_time": common.GetTimestamp(),
-				"status":        common.RedemptionCodeStatusUsed,
-				"used_user_id":  userId,
+				"redeemed_time":            common.GetTimestamp(),
+				"status":                   common.RedemptionCodeStatusUsed,
+				"used_user_id":             userId,
+				"used_quota_at_redemption": user.UsedQuota,
 			})
 		if result.Error != nil {
 			return result.Error

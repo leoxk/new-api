@@ -16,6 +16,12 @@ func quotaForUSD(t *testing.T, amount int64) int {
 	return quota
 }
 
+func ensureWalletBalanceTables(t *testing.T) {
+	t.Helper()
+	require.NoError(t, DB.AutoMigrate(&Redemption{}))
+	require.NoError(t, DB.Exec("DELETE FROM redemptions").Error)
+}
+
 func seedSuccessfulTopUp(t *testing.T, userID int, tradeNo string, money float64, refundedMoney float64) {
 	t.Helper()
 	require.NoError(t, DB.Create(&TopUp{
@@ -31,6 +37,7 @@ func seedSuccessfulTopUp(t *testing.T, userID int, tradeNo string, money float64
 }
 
 func TestGetUserWalletBalanceDerivesPromotionalCreditFirst(t *testing.T) {
+	ensureWalletBalanceTables(t)
 	tests := []struct {
 		name               string
 		currentUSD         int64
@@ -64,7 +71,93 @@ func TestGetUserWalletBalanceDerivesPromotionalCreditFirst(t *testing.T) {
 	}
 }
 
+func TestGetUserWalletBalanceTracksRedemptionBelowHistoricalCashFunding(t *testing.T) {
+	ensureWalletBalanceTables(t)
+	truncateTables(t)
+	user := &User{
+		Username:  "wallet-redemption-after-cash-usage",
+		Status:    common.UserStatusEnabled,
+		Quota:     quotaForUSD(t, 60),
+		UsedQuota: quotaForUSD(t, 100),
+	}
+	require.NoError(t, DB.Create(user).Error)
+	seedSuccessfulTopUp(t, user.Id, "wallet-redemption-after-cash-usage", 135, 0)
+	require.NoError(t, DB.Create(&[]Redemption{
+		{
+			Key:                   "20000000000000000000000000000001",
+			Name:                  "consumed promotion",
+			Status:                common.RedemptionCodeStatusUsed,
+			Quota:                 quotaForUSD(t, 25),
+			RedeemedTime:          1,
+			UsedUserId:            user.Id,
+			UsedQuotaAtRedemption: quotaForUSD(t, 70),
+		},
+		{
+			Key:                   "20000000000000000000000000000002",
+			Name:                  "current promotion",
+			Status:                common.RedemptionCodeStatusUsed,
+			Quota:                 quotaForUSD(t, 25),
+			RedeemedTime:          2,
+			UsedUserId:            user.Id,
+			UsedQuotaAtRedemption: quotaForUSD(t, 100),
+		},
+	}).Error)
+
+	balance, err := GetUserWalletBalance(user.Id, user.Quota)
+	require.NoError(t, err)
+	assert.Equal(t, quotaForUSD(t, 35), balance.RechargeQuota)
+	assert.Equal(t, quotaForUSD(t, 25), balance.PromotionalQuota)
+
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", user.Id).Updates(map[string]interface{}{
+		"quota":      quotaForUSD(t, 50),
+		"used_quota": quotaForUSD(t, 110),
+	}).Error)
+	balance, err = GetUserWalletBalance(user.Id, quotaForUSD(t, 50))
+	require.NoError(t, err)
+	assert.Equal(t, quotaForUSD(t, 35), balance.RechargeQuota)
+	assert.Equal(t, quotaForUSD(t, 15), balance.PromotionalQuota)
+}
+
+func TestBackfillB2BRedemptionUsageSnapshotsKeepsOnlyNewestLegacyCredit(t *testing.T) {
+	ensureWalletBalanceTables(t)
+	truncateTables(t)
+	b2bUser := &User{
+		Username:  "legacy-b2b-redemption",
+		Group:     "b2b",
+		AffCode:   "legacy-b2b",
+		Status:    common.UserStatusEnabled,
+		UsedQuota: quotaForUSD(t, 100),
+	}
+	defaultUser := &User{
+		Username:  "legacy-default-redemption",
+		Group:     "default",
+		AffCode:   "legacy-default",
+		Status:    common.UserStatusEnabled,
+		UsedQuota: quotaForUSD(t, 40),
+	}
+	require.NoError(t, DB.Create(b2bUser).Error)
+	require.NoError(t, DB.Create(defaultUser).Error)
+	require.NoError(t, DB.Create(&[]Redemption{
+		{Key: "30000000000000000000000000000001", Status: common.RedemptionCodeStatusUsed, UsedUserId: b2bUser.Id, RedeemedTime: 1, UsedQuotaAtRedemption: -1},
+		{Key: "30000000000000000000000000000002", Status: common.RedemptionCodeStatusUsed, UsedUserId: b2bUser.Id, RedeemedTime: 2, UsedQuotaAtRedemption: -1},
+		{Key: "30000000000000000000000000000003", Status: common.RedemptionCodeStatusUsed, UsedUserId: defaultUser.Id, RedeemedTime: 3, UsedQuotaAtRedemption: -1},
+	}).Error)
+
+	require.NoError(t, backfillB2BRedemptionUsageSnapshots())
+
+	var b2bRedemptions []Redemption
+	require.NoError(t, DB.Where("used_user_id = ?", b2bUser.Id).Order("redeemed_time asc").Find(&b2bRedemptions).Error)
+	require.Len(t, b2bRedemptions, 2)
+	assert.Equal(t, ignoredLegacyRedemptionUsageSnapshot, b2bRedemptions[0].UsedQuotaAtRedemption)
+	assert.Equal(t, b2bUser.UsedQuota, b2bRedemptions[1].UsedQuotaAtRedemption)
+
+	var unchangedDefault Redemption
+	require.NoError(t, DB.Where("used_user_id = ?", defaultUser.Id).First(&unchangedDefault).Error)
+	assert.Equal(t, -1, unchangedDefault.UsedQuotaAtRedemption)
+}
+
 func TestRecordCompletedTopUpRefundUpdatesOrderAndQuota(t *testing.T) {
+	ensureWalletBalanceTables(t)
 	truncateTables(t)
 	user := &User{Username: "refund-user", Status: common.UserStatusEnabled, Quota: quotaForUSD(t, 110)}
 	require.NoError(t, DB.Create(user).Error)
@@ -88,6 +181,7 @@ func TestRecordCompletedTopUpRefundUpdatesOrderAndQuota(t *testing.T) {
 }
 
 func TestRecordCompletedTopUpRefundRejectsAmountAboveRechargeBalance(t *testing.T) {
+	ensureWalletBalanceTables(t)
 	truncateTables(t)
 	user := &User{Username: "refund-limit-user", Status: common.UserStatusEnabled, Quota: quotaForUSD(t, 30)}
 	require.NoError(t, DB.Create(user).Error)
@@ -102,6 +196,7 @@ func TestRecordCompletedTopUpRefundRejectsAmountAboveRechargeBalance(t *testing.
 }
 
 func TestRecordCompletedTopUpRefundRejectsSecondRefundForOrder(t *testing.T) {
+	ensureWalletBalanceTables(t)
 	truncateTables(t)
 	user := &User{Username: "refund-once-user", Status: common.UserStatusEnabled, Quota: quotaForUSD(t, 100)}
 	require.NoError(t, DB.Create(user).Error)

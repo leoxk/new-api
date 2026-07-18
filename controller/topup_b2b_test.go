@@ -22,7 +22,7 @@ type b2bAPIResponse struct {
 func setupB2BControllerTestDB(t *testing.T) {
 	t.Helper()
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.Log{}, &model.Redemption{}))
 }
 
 func invokeController(t *testing.T, method string, body interface{}, handler gin.HandlerFunc, values map[string]interface{}) b2bAPIResponse {

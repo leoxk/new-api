@@ -127,6 +127,7 @@ func setupRedeemFixture(t *testing.T, quota int) (userId int, key string) {
 
 func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	userId, key := setupRedeemFixture(t, 500)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", userId).Update("used_quota", 700).Error)
 
 	quota, err := Redeem(key, userId)
 	require.NoError(t, err)
@@ -140,6 +141,7 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	require.NoError(t, DB.First(&redemption, "name = ?", "redeem-test").Error)
 	assert.Equal(t, common.RedemptionCodeStatusUsed, redemption.Status)
 	assert.Equal(t, userId, redemption.UsedUserId)
+	assert.Equal(t, 700, redemption.UsedQuotaAtRedemption)
 
 	// Redeeming the same code again must fail and must not credit quota.
 	_, err = Redeem(key, userId)
