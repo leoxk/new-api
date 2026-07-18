@@ -9,6 +9,7 @@
 - 注册赠送、邀请奖励、签到奖励和订阅保持关闭；只使用兑换码发放促销额度。
 - Stripe Promotion Codes 和 Amount Discount 保持关闭。
 - Glimo Lab 当前只接入 Stripe；不得在 staging 或生产注入 PayPal 凭证或向客户显示 PayPal 入口。
+- Stripe 最低充值金额固定为 US$20，快捷充值选项不得包含低于 US$20 的金额。
 - Komodo 仅监控；GitHub Actions 是唯一自动部署路径。
 
 ## 客户审批与测试账号
@@ -44,6 +45,8 @@
 
 Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_ID` 运行时环境变量覆盖旧设置；Glimo staging/production 必须使用 GitHub Environment Secrets 注入，不在 New API 数据库选项或主机长期文件中保存生产 secret。Stripe Promotion Codes 与 Amount Discount 继续关闭。
 
+对账时单独记录 Stripe 原交易手续费、结算币种、Stripe FX 汇率和净入账金额。客户 Recharge Balance 始终按 USD 付款金额 1:1 入账，不按 HKD 净结算额折算或减少。
+
 ## 人工退款
 
 1. 收到申请后冻结该笔退款处理，导出客户成功充值、历史退款和完整 Usage Logs。
@@ -52,7 +55,8 @@ Stripe 在本分支支持以 `STRIPE_API_SECRET`、`STRIPE_WEBHOOK_SECRET`、`ST
 4. 经第二人批准后，在 Stripe 原路退款。
 5. 只有处理器显示完成后，管理员在 Billing History 选择 `Record Completed Refund`，填写处理器 refund ID、金额和原因。
 6. 确认系统在一次事务中写入退款字段并扣除等额 quota；核对 Total = Recharge + Promotional。
-7. 保存处理器凭证、审计日志和客户通知。不得用此按钮发起支付处理器退款。
+7. Pilot 阶段不得从客户退款金额中扣除 Stripe 不退还的原交易手续费；将该手续费记录为 Glimo Lab 支付成本。
+8. 保存处理器凭证、审计日志和客户通知。不得用此按钮发起支付处理器退款。
 
 Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不足，先暂停账号并由负责人决定追偿或坏账处理，禁止把余额扣成负数。
 

@@ -64,12 +64,13 @@ GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Cata
 - Recharge Balance：现金充值后形成的余额，可申请人工退款审核。
 - Promotional Credit：兑换码或人工赠送形成的额度，优先消费、不可退款、不可转移。
 - 现金充值保持 1:1：支付 US$1，形成 US$1 Recharge Balance。模型倍率只影响调用费用，不改变充值价值。
+- Stripe 最低充值金额为 US$20；控制台不会提供低于最低金额的快捷充值选项。
 - 充值仅支持 Stripe 托管的信用卡/借记卡 Checkout；Glimo Lab 不接触或保存银行卡号。
 - Stripe 提供付款和退款收据；如需公司发票，请联系支持人员人工处理。
 
 ## 人工退款
 
-通过支持邮箱提交订单号、付款账号、退款原因和联系人。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。
+通过支持邮箱提交订单号、付款账号、退款原因和联系人。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。Pilot 阶段经审核批准的退款不会从客户退款金额中扣除原交易的 Stripe 手续费；该费用由 Glimo Lab 承担。
 
 ## 用量与排错
 
