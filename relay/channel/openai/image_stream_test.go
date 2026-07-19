@@ -66,6 +66,46 @@ func TestOpenaiImageDoResponseUsesInfoIsStream(t *testing.T) {
 	})
 }
 
+func TestOpenaiImageHandlerFailsClosedForUnpricedB2BUsage(t *testing.T) {
+	oldMode := gin.Mode()
+	gin.SetMode(gin.TestMode)
+	t.Cleanup(func() { gin.SetMode(oldMode) })
+
+	body := `{"created":1710000000,"data":[{"b64_json":"image"}]}`
+	c, recorder, resp, info := newImageTestContext(t, body, "application/json", false)
+	info.UserGroup = "b2b"
+	info.UsingGroup = "b2b"
+	info.OriginModelName = "gpt-image-2"
+
+	usage, err := OpenaiImageHandler(c, info, resp)
+
+	require.Nil(t, usage)
+	require.NotNil(t, err)
+	require.Equal(t, http.StatusBadGateway, err.StatusCode)
+	require.Equal(t, "model_price_error", string(err.GetErrorCode()))
+	require.Empty(t, recorder.Body.String(), "unbilled image bytes must not reach the customer")
+}
+
+func TestOpenaiImageHandlerAllowsVerifiedB2BUsage(t *testing.T) {
+	oldMode := gin.Mode()
+	gin.SetMode(gin.TestMode)
+	t.Cleanup(func() { gin.SetMode(oldMode) })
+
+	body := `{"created":1710000000,"data":[{"b64_json":"image"}],"usage":{"input_tokens":3,"output_tokens":4,"total_tokens":7}}`
+	c, recorder, resp, info := newImageTestContext(t, body, "application/json", false)
+	info.UserGroup = "b2b"
+	info.UsingGroup = "b2b"
+	info.OriginModelName = "gpt-image-2"
+
+	usage, err := OpenaiImageHandler(c, info, resp)
+
+	require.Nil(t, err)
+	require.Equal(t, 3, usage.PromptTokens)
+	require.Equal(t, 4, usage.CompletionTokens)
+	require.Equal(t, 7, usage.TotalTokens)
+	require.Equal(t, body, recorder.Body.String())
+}
+
 // TestOpenaiImageStreamHandlerForwardsSSEAndUsage covers the core SSE path:
 // chunks are forwarded with rebuilt event lines, usage is extracted and
 // normalized (input_tokens -> prompt_tokens with details), and [DONE] is

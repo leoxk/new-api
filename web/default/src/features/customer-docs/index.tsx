@@ -173,9 +173,14 @@ console.log(response.choices[0].message.content)`
                   key={item.category}
                   className='space-y-2 rounded-lg border p-4'
                 >
-                  <div className='flex flex-wrap items-center gap-2'>
+                  <div className='flex min-w-0 flex-wrap items-center gap-2'>
                     <h3 className='font-semibold'>{item.category}</h3>
-                    <Badge variant='secondary'>{item.pricing}</Badge>
+                    <Badge
+                      variant='secondary'
+                      className='h-auto max-w-full whitespace-normal text-left leading-5'
+                    >
+                      {item.pricing}
+                    </Badge>
                   </div>
                   <p className='font-mono text-sm leading-6'>{item.models}</p>
                 </div>
