@@ -375,6 +375,39 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	require.NotContains(t, ids, "zz-token-unpriced-model")
 }
 
+func TestListModelsHidesDisabledGPTImageForB2BOnly(t *testing.T) {
+	t.Setenv("GLIMO_B2B_GPT_IMAGE_ENABLED", "false")
+	withSelfUseModeEnabled(t)
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.Create(&[]model.Ability{
+		{Group: "b2b", Model: "gpt-5.6-sol", ChannelId: 1, Enabled: true},
+		{Group: "b2b", Model: "gpt-image-1", ChannelId: 1, Enabled: true},
+		{Group: "b2b", Model: "gpt-image-2", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "gpt-image-2", ChannelId: 1, Enabled: true},
+	}).Error)
+
+	b2bRecorder := httptest.NewRecorder()
+	b2bContext, _ := gin.CreateTestContext(b2bRecorder)
+	b2bContext.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	common.SetContextKey(b2bContext, constant.ContextKeyUserGroup, "b2b")
+
+	ListModels(b2bContext, constant.ChannelTypeOpenAI)
+
+	b2bModels := decodeListModelsResponse(t, b2bRecorder)
+	require.Contains(t, b2bModels, "gpt-5.6-sol")
+	require.NotContains(t, b2bModels, "gpt-image-1")
+	require.NotContains(t, b2bModels, "gpt-image-2")
+
+	defaultRecorder := httptest.NewRecorder()
+	defaultContext, _ := gin.CreateTestContext(defaultRecorder)
+	defaultContext.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	common.SetContextKey(defaultContext, constant.ContextKeyUserGroup, "default")
+
+	ListModels(defaultContext, constant.ChannelTypeOpenAI)
+
+	require.Contains(t, decodeListModelsResponse(t, defaultRecorder), "gpt-image-2")
+}
+
 func TestCheckUpdatePasswordRequiresCurrentPassword(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	hashedPassword, err := common.Password2Hash("CurrentPassword123")

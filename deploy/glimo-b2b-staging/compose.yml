@@ -17,6 +17,7 @@ services:
       NODE_NAME: glimo-b2b-payment-staging
       ERROR_LOG_ENABLED: "true"
       MEMORY_CACHE_ENABLED: "true"
+      GLIMO_B2B_GPT_IMAGE_ENABLED: "false"
       BATCH_UPDATE_ENABLED: "false"
       GENERATE_DEFAULT_TOKEN: "false"
       STRIPE_API_SECRET: ${STRIPE_API_SECRET:-}

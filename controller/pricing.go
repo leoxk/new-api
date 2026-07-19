@@ -4,6 +4,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -75,6 +76,9 @@ func GetPricing(c *gin.Context) {
 		enabledModels := make([]string, 0)
 		for _, autoGroup := range service.GetUserAutoGroup(group) {
 			for _, modelName := range model.GetGroupEnabledModels(autoGroup) {
+				if model_setting.IsModelBlockedForUserGroup(group, modelName) {
+					continue
+				}
 				if !common.StringsContains(enabledModels, modelName) {
 					enabledModels = append(enabledModels, modelName)
 				}
