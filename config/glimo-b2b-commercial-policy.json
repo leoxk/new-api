@@ -1,0 +1,85 @@
+{
+  "version": "2026-07-19",
+  "currency": "USD",
+  "quotaPerUnit": 500000,
+  "officialSources": {
+    "openai": "https://developers.openai.com/api/docs/pricing/",
+    "deepseek": "https://api-docs.deepseek.com/quick_start/pricing"
+  },
+  "groups": {
+    "b2b": {
+      "usageRatio": 0.1,
+      "topupRatio": 1
+    },
+    "b2b-deepseek": {
+      "usageRatio": 1.1,
+      "topupRatio": 1
+    }
+  },
+  "excludedModels": [
+    "codex-auto-review",
+    "dall-e-3"
+  ],
+  "models": {
+    "gpt-5.4": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 2.5, "cachedInput": 0.25, "output": 15 },
+      "newApi": { "modelRatio": 1.25, "completionRatio": 6, "cacheRatio": 0.1 }
+    },
+    "gpt-5.4-mini": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 0.75, "cachedInput": 0.075, "output": 4.5 },
+      "newApi": { "modelRatio": 0.375, "completionRatio": 6, "cacheRatio": 0.1 }
+    },
+    "gpt-5.5": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 5, "cachedInput": 0.5, "output": 30 },
+      "newApi": { "modelRatio": 2.5, "completionRatio": 6, "cacheRatio": 0.1 }
+    },
+    "gpt-5.6-luna": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 1, "cachedInput": 0.1, "cacheWrite": 1.25, "output": 6 },
+      "newApi": { "modelRatio": 0.5, "completionRatio": 6, "cacheRatio": 0.1, "createCacheRatio": 1.25 }
+    },
+    "gpt-5.6-terra": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 2.5, "cachedInput": 0.25, "cacheWrite": 3.125, "output": 15 },
+      "newApi": { "modelRatio": 1.25, "completionRatio": 6, "cacheRatio": 0.1, "createCacheRatio": 1.25 }
+    },
+    "gpt-5.6-sol": {
+      "category": "gpt-text",
+      "group": "b2b",
+      "officialUsdPerMillion": { "input": 5, "cachedInput": 0.5, "cacheWrite": 6.25, "output": 30 },
+      "newApi": { "modelRatio": 2.5, "completionRatio": 6, "cacheRatio": 0.1, "createCacheRatio": 1.25 }
+    },
+    "deepseek-v4-flash": {
+      "category": "deepseek",
+      "group": "b2b-deepseek",
+      "officialUsdPerMillion": { "cacheHit": 0.0028, "cacheMiss": 0.14, "output": 0.28 },
+      "newApi": { "modelRatio": 0.07, "completionRatio": 2, "cacheRatio": 0.02 }
+    },
+    "deepseek-v4-pro": {
+      "category": "deepseek",
+      "group": "b2b-deepseek",
+      "officialUsdPerMillion": { "cacheHit": 0.003625, "cacheMiss": 0.435, "output": 0.87 },
+      "newApi": { "modelRatio": 0.2175, "completionRatio": 2, "cacheRatio": 0.008333333333333333 }
+    },
+    "gpt-image-1": {
+      "category": "gpt-image",
+      "group": "b2b",
+      "officialUsdPerMillion": { "textInput": 5, "textCachedInput": 1.25, "imageInput": 10, "imageCachedInput": 2.5, "imageOutput": 40 },
+      "newApi": { "modelRatio": 2.5, "completionRatio": 8, "cacheRatio": 0.25, "imageRatio": 2 }
+    },
+    "gpt-image-2": {
+      "category": "gpt-image",
+      "group": "b2b",
+      "officialUsdPerMillion": { "textInput": 5, "textCachedInput": 1.25, "imageInput": 8, "imageCachedInput": 2, "imageOutput": 30 },
+      "newApi": { "modelRatio": 2.5, "completionRatio": 6, "cacheRatio": 0.25, "imageRatio": 1.6 }
+    }
+  }
+}
