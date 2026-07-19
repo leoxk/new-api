@@ -58,6 +58,9 @@ jobs:
           mkdir -p web/classic/dist
           printf '<!doctype html><title>test fixture</title>\n' > web/classic/dist/index.html
 
+      - name: Test Glimo B2B commercial policy audit
+        run: node --test scripts/glimo-b2b-policy-audit.test.mjs
+
       - name: Test backend
         run: go test ./...
 
