@@ -159,6 +159,8 @@ jobs:
           ssh_dir="$RUNNER_TEMP/catalog-gate-ssh"
           tunnel_port=33100
           tunnel_pid=""
+          models_response_file="$RUNNER_TEMP/catalog-gate-models-response.json"
+          models_headers_file="$RUNNER_TEMP/catalog-gate-models-headers.txt"
           response_file="$RUNNER_TEMP/gpt-image-gate-response.json"
           headers_file="$RUNNER_TEMP/gpt-image-gate-headers.txt"
           cleanup() {
@@ -168,7 +170,11 @@ jobs:
               wait "$tunnel_pid" >/dev/null 2>&1 || true
             fi
             rm -rf "$ssh_dir"
-            rm -f "$response_file" "$headers_file"
+            rm -f \
+              "$models_response_file" \
+              "$models_headers_file" \
+              "$response_file" \
+              "$headers_file"
             exit "$status"
           }
           trap cleanup EXIT
@@ -208,7 +214,7 @@ jobs:
               --format '{{.ID}}'); \
              [[ -n \"\$container\" ]] || exit 1; \
              docker exec \"\$container\" sh -lc \
-               'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -Atc \"SELECT key FROM tokens WHERE user_id=3 AND status=1 AND (unlimited_quota=true OR remain_quota>0) ORDER BY id DESC LIMIT 1;\"'")"
+               'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -Atc \"SELECT t.key FROM tokens t JOIN users u ON u.id=t.user_id WHERE t.user_id=3 AND u.username='\"'\"'b2btest'\"'\"' AND u.status=1 AND u.\"group\"='\"'\"'b2b'\"'\"' AND u.deleted_at IS NULL AND t.status=1 AND t.\"group\"='\"'\"'auto'\"'\"' AND t.cross_group_retry=false AND (t.expired_time=-1 OR t.expired_time>EXTRACT(EPOCH FROM NOW())::bigint) AND (t.unlimited_quota=true OR t.remain_quota>0) AND COALESCE(t.allow_ips,'\"'\"''\"'\"')='\"'\"''\"'\"' AND t.deleted_at IS NULL ORDER BY t.id DESC LIMIT 1;\"'")"
           if [[ -z "$customer_key" || "$customer_key" == *$'\n'* ]]; then
             echo "No single enabled API key is available for the controlled b2btest customer" >&2
             exit 1
@@ -217,9 +223,26 @@ jobs:
             customer_key="sk-$customer_key"
           fi
 
-          models_json="$(curl --fail-with-body --silent --show-error \
+          curl --silent --show-error \
+            -o "$models_response_file" \
+            --dump-header "$models_headers_file" \
             -H "Authorization: Bearer $customer_key" \
-            "$base_url/v1/models")"
+            "$base_url/v1/models"
+          models_status="$(awk '$1 ~ /^HTTP\// { code=$2 } END { print code }' \
+            "$models_headers_file")"
+          if [[ "$models_status" != 200 ]]; then
+            error_code="$(jq -r '.error.code // "unknown"' "$models_response_file" 2>/dev/null || true)"
+            error_category="unknown"
+            case "$(jq -r '.error.message // ""' "$models_response_file" 2>/dev/null || true)" in
+              *"IP"*) error_category="token_ip_restriction" ;;
+              *"封禁"*) error_category="user_disabled" ;;
+              *"无权访问"*) error_category="token_group_not_allowed" ;;
+              *"已被弃用"*) error_category="token_group_deprecated" ;;
+            esac
+            echo "B2B model-list authentication failed: HTTP $models_status, code=$error_code, category=$error_category" >&2
+            exit 1
+          fi
+          models_json="$(<"$models_response_file")"
           if jq -e '.data[]? | select(.id == "gpt-image-1" or .id == "gpt-image-2")' \
             <<<"$models_json" >/dev/null; then
             echo "B2B model list still exposes a deferred GPT Image model" >&2
