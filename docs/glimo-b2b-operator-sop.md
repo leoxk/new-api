@@ -62,6 +62,8 @@ Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不
 
 支付 staging 无需把管理员 token 放入浏览器或本机。Stripe Sandbox 已完成退款后，可手工触发 `Glimo B2B staging operations` workflow；该 job 只接受 `re_...` 退款 ID，并在登记前验证订单属于受控 `b2btest`、状态成功、支付方式为 Stripe、尚未退款且金额未超出订单。此入口不能用于生产。
 
+staging 的 B2B 路由配置需要校正时，先运行同一 workflow 的 `sync_b2b_catalog_policy`：它只在独立 staging 中补齐 `AutoGroups`，将 `b2b` 的可用范围限定为 `auto` 和 `b2b-deepseek`，并从全局客户可选组中隐藏内部组。随后运行 `verify_b2b_catalog_gate`，确认受控 `auto` Key 可以读取目录，且暂缓的 GPT Image 模型既不出现在目录中，也会在选取 channel 前返回 `model_not_found`。两个操作都不能用于生产。
+
 ## 路由和异常处理
 
 - GPT 标准外部客户应记录实际 group=`b2b`、group ratio=`0.3`。GPT Image 在暂缓期间不得产生 B2B 成功用量。

@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - record_completed_stripe_refund
+          - sync_b2b_catalog_policy
           - verify_b2b_catalog_gate
       trade_no:
         description: Exact New API staging top-up order number
@@ -137,6 +138,155 @@ jobs:
           fi
 
           echo "Completed Stripe Sandbox refund recorded for the controlled b2btest order"
+
+  sync-b2b-catalog-policy:
+    if: ${{ inputs.operation == 'sync_b2b_catalog_policy' }}
+    runs-on: ubuntu-latest
+    environment: glimo-gateway-staging
+    steps:
+      - name: Synchronize the approved B2B auto-routing policy
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ vars.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          STAGING_ADMIN_ACCESS_TOKEN: ${{ secrets.STAGING_ADMIN_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          : "${DEPLOY_HOST:?missing staging deployment host}"
+          : "${DEPLOY_USER:?missing staging deployment user}"
+          : "${DEPLOY_SSH_KNOWN_HOSTS:?missing pinned staging host key}"
+          : "${DEPLOY_SSH_PRIVATE_KEY:?missing staging deployment key}"
+          : "${STAGING_ADMIN_ACCESS_TOKEN:?missing staging admin access token}"
+
+          ssh_dir="$RUNNER_TEMP/catalog-policy-ssh"
+          tunnel_port=33101
+          tunnel_pid=""
+          options_file="$RUNNER_TEMP/catalog-policy-options.json"
+          cleanup() {
+            status=$?
+            if [[ -n "$tunnel_pid" ]]; then
+              kill "$tunnel_pid" >/dev/null 2>&1 || true
+              wait "$tunnel_pid" >/dev/null 2>&1 || true
+            fi
+            rm -rf "$ssh_dir"
+            rm -f "$options_file"
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          install -m 0700 -d "$ssh_dir"
+          install -m 0600 /dev/null "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          cat > "$ssh_dir/config" <<EOF
+          Host glimo-staging
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile $ssh_dir/key
+            UserKnownHostsFile $ssh_dir/known_hosts
+            StrictHostKeyChecking yes
+            ExitOnForwardFailure yes
+          EOF
+          chmod 0600 "$ssh_dir/config"
+
+          ssh -F "$ssh_dir/config" -N \
+            -L "127.0.0.1:${tunnel_port}:127.0.0.1:3100" \
+            glimo-staging &
+          tunnel_pid=$!
+          base_url="http://127.0.0.1:${tunnel_port}"
+          for _ in $(seq 1 20); do
+            if curl --fail --silent --show-error "$base_url/api/status" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error "$base_url/api/status" >/dev/null
+
+          auth_headers=(
+            -H "Authorization: Bearer $STAGING_ADMIN_ACCESS_TOKEN"
+            -H "New-Api-User: 1"
+          )
+          curl --fail-with-body --silent --show-error \
+            "${auth_headers[@]}" \
+            -o "$options_file" \
+            "$base_url/api/option/"
+          if [[ "$(jq -r '.success' "$options_file")" != true ]]; then
+            echo "Unable to read the current staging options" >&2
+            exit 1
+          fi
+
+          current_auto_groups="$(jq -er '
+            [.data[] | select(.key == "AutoGroups")][0].value | fromjson
+          ' "$options_file")"
+          updated_auto_groups="$(jq -c '
+            . + ["b2b", "b2b-deepseek"] | unique
+          ' <<<"$current_auto_groups")"
+
+          current_user_groups="$(jq -er '
+            [.data[] | select(.key == "UserUsableGroups")][0].value | fromjson
+          ' "$options_file")"
+          updated_user_groups="$(jq -c '
+            del(.b2b, ."b2b-deepseek")
+          ' <<<"$current_user_groups")"
+
+          current_special_groups="$(jq -er '
+            [.data[] | select(.key == "group_ratio_setting.group_special_usable_group")][0].value
+            | fromjson
+          ' "$options_file")"
+          updated_special_groups="$(jq -c '
+            .b2b = {
+              "-:default": "",
+              "+:auto": "Auto",
+              "+:b2b-deepseek": "DeepSeek"
+            }
+          ' <<<"$current_special_groups")"
+
+          for option in \
+            "$(jq -cn --arg value "$updated_auto_groups" \
+              '{key:"AutoGroups", value:$value}')" \
+            "$(jq -cn --arg value "$updated_user_groups" \
+              '{key:"UserUsableGroups", value:$value}')" \
+            "$(jq -cn --arg value "$updated_special_groups" \
+              '{key:"group_ratio_setting.group_special_usable_group", value:$value}')"; do
+            result="$(curl --fail-with-body --silent --show-error \
+              -X PUT \
+              "${auth_headers[@]}" \
+              -H "Content-Type: application/json" \
+              --data "$option" \
+              "$base_url/api/option/")"
+            if [[ "$(jq -r '.success' <<<"$result")" != true ]]; then
+              echo "Failed to synchronize one staging B2B catalog option" >&2
+              exit 1
+            fi
+          done
+
+          curl --fail-with-body --silent --show-error \
+            "${auth_headers[@]}" \
+            -o "$options_file" \
+            "$base_url/api/option/"
+          if ! jq -e '
+            ([.data[] | select(.key == "AutoGroups")][0].value | fromjson) as $auto
+            | ([.data[] | select(.key == "UserUsableGroups")][0].value |
+                fromjson) as $exposed
+            | ([.data[] |
+                select(.key == "group_ratio_setting.group_special_usable_group")][0].value |
+                fromjson) as $special
+            | ($auto | index("b2b")) != null
+            and ($auto | index("b2b-deepseek")) != null
+            and ($exposed | has("b2b") | not)
+            and ($exposed | has("b2b-deepseek") | not)
+            and $special.b2b["-:default"] == ""
+            and $special.b2b["+:auto"] == "Auto"
+            and $special.b2b["+:b2b-deepseek"] == "DeepSeek"
+            and ($special.b2b | has("+:default") | not)
+          ' "$options_file" >/dev/null; then
+            echo "Staging B2B catalog policy did not persist as expected" >&2
+            exit 1
+          fi
+
+          echo "Staging B2B catalog policy synchronized without exposing internal groups globally"
 
   verify-b2b-catalog-gate:
     if: ${{ inputs.operation == 'verify_b2b_catalog_gate' }}
