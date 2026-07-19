@@ -11,6 +11,9 @@ function passingSnapshot() {
     GroupRatio: Object.fromEntries(
       Object.entries(policy.groups).map(([group, value]) => [group, value.usageRatio]),
     ),
+    'group_ratio_setting.group_ratio': Object.fromEntries(
+      Object.entries(policy.groups).map(([group, value]) => [group, value.usageRatio]),
+    ),
     TopupGroupRatio: Object.fromEntries(
       Object.entries(policy.groups).map(([group, value]) => [group, value.topupRatio]),
     ),
@@ -60,23 +63,29 @@ test('approved catalog and pricing pass', () => {
   assert.equal(result.ok, true)
   assert.deepEqual(result.errors, [])
   assert.equal(result.summary.approvedModels, 10)
-  assert.equal(result.customerRates['gpt-5.6-sol'].usdPerMillion.input, 0.5)
+  assert.equal(result.customerRates['gpt-5.6-sol'].usdPerMillion.input, 1.5)
   assert.ok(
     Math.abs(result.customerRates['deepseek-v4-pro'].usdPerMillion.output - 0.957) <
       1e-12,
   )
-  assert.equal(result.customerRates['gpt-image-2'].usdPerMillion.imageOutput, 3)
+  assert.equal(result.customerRates['gpt-image-2'].usdPerMillion.imageOutput, 9)
 })
 
-test('current production b2b ratio drift fails loudly', () => {
+test('stale ten-percent b2b ratio fails loudly', () => {
   const snapshot = passingSnapshot()
-  snapshot.options.GroupRatio.b2b = 0.3
+  snapshot.options.GroupRatio.b2b = 0.1
+  snapshot.options['group_ratio_setting.group_ratio'].b2b = 0.1
   snapshot.b2bUserCount = 2
   snapshot.b2bTokenCount = 57
 
   const result = auditSnapshot(snapshot, policy)
   assert.equal(result.ok, false)
-  assert.ok(result.errors.includes('GroupRatio.b2b: expected 0.1, found 0.3'))
+  assert.ok(result.errors.includes('GroupRatio.b2b: expected 0.3, found 0.1'))
+  assert.ok(
+    result.errors.includes(
+      'group_ratio_setting.group_ratio.b2b: expected 0.3, found 0.1',
+    ),
+  )
   assert.ok(result.warnings[0].includes('2 production user(s)'))
 })
 

@@ -303,7 +303,7 @@ changing routing or price calculation:
 Deployment run `29642382691` passed the full frontend/backend verification,
 immutable ARM64 image build, isolated staging deployment, local/public health
 checks, and cleanup. Desktop browser acceptance confirmed that the customer
-page contained none of `b2b x0.1`, `b2b-deepseek x1.1`, or the Groups filter.
+page contained no internal `b2b`/`b2b-deepseek` ratio labels or Groups filter.
 
 That acceptance pass found one remaining generic sentence mentioning group.
 PR `#18` removed that wording for customers while preserving the administrator

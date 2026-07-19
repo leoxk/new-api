@@ -20,7 +20,7 @@
 
 1. 10 个批准模型各完成一次成功调用，记录 request ID、实际路由组、倍率和扣费。
 2. `codex-auto-review`、`dall-e-3` 和一个任意未批准模型返回 model-not-available，且无 default 回退。
-3. GPT 文本分别覆盖 input、cached input、cache write、output、reasoning并验证 `b2b=0.1`；DeepSeek 覆盖 cache hit/miss/output并验证官方 base rate × `b2b-deepseek=1.10`；GPT Image 覆盖每个开放 size/quality 组合并验证 `b2b=0.1`。
+3. GPT 文本分别覆盖 input、cached input、cache write、output、reasoning并验证标准外部客户 `b2b=0.3`；DeepSeek 覆盖 cache hit/miss/output并验证官方 base rate × `b2b-deepseek=1.10`；GPT Image 覆盖每个开放 size/quality 组合并验证 `b2b=0.3`。
 4. Stripe Test Mode 覆盖成功、取消、失败、延迟、重复 webhook、金额不符和币种不符；PayPal 不属于当前商业和验收范围。
 5. 验证 US$20 最低充值：US$19 请求被拒绝，US$20 Checkout 与 Recharge Balance 按 1:1 处理，快捷充值选项不出现低于 US$20 的金额。
 6. 覆盖只有现金、只有促销、混合余额、部分消费、全额/部分人工退款和重复退款登记；Pilot 退款不从客户金额中扣除 Stripe 原交易手续费。

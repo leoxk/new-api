@@ -31,7 +31,7 @@ const approvedModels = [
     category: 'GPT Text & Reasoning',
     models:
       'gpt-5.4, gpt-5.4-mini, gpt-5.5, gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol',
-    pricing: '10% of the matching OpenAI Standard short-context reference rate',
+    pricing: '30% of the matching OpenAI Standard short-context reference rate',
   },
   {
     category: 'DeepSeek',
@@ -41,7 +41,7 @@ const approvedModels = [
   {
     category: 'GPT Image',
     models: 'gpt-image-1, gpt-image-2',
-    pricing: '10% of the matching OpenAI Standard image reference rate',
+    pricing: '30% of the matching OpenAI Standard image reference rate',
   },
 ]
 
