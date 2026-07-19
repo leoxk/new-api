@@ -9,21 +9,22 @@ on:
         type: choice
         options:
           - record_completed_stripe_refund
+          - verify_b2b_catalog_gate
       trade_no:
         description: Exact New API staging top-up order number
-        required: true
+        required: false
         type: string
       provider_refund_id:
         description: Completed Stripe Sandbox refund ID (re_...)
-        required: true
+        required: false
         type: string
       refunded_money:
         description: Completed refund amount in USD (maximum two decimals)
-        required: true
+        required: false
         type: string
       reason:
         description: Audit reason for the completed refund
-        required: true
+        required: false
         type: string
 
 concurrency:
@@ -136,3 +137,47 @@ jobs:
           fi
 
           echo "Completed Stripe Sandbox refund recorded for the controlled b2btest order"
+
+  verify-b2b-catalog-gate:
+    if: ${{ inputs.operation == 'verify_b2b_catalog_gate' }}
+    runs-on: ubuntu-latest
+    environment: glimo-gateway-staging
+    steps:
+      - name: Verify B2B GPT Image is hidden and rejected before routing
+        env:
+          STAGING_CUSTOMER_API_KEY: ${{ secrets.STAGING_CUSTOMER_API_KEY }}
+          STAGING_PUBLIC_HEALTH_URL: ${{ vars.STAGING_PUBLIC_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+
+          : "${STAGING_CUSTOMER_API_KEY:?missing staging customer API key}"
+          : "${STAGING_PUBLIC_HEALTH_URL:?missing staging public health URL}"
+          base_url="${STAGING_PUBLIC_HEALTH_URL%/api/status}"
+          response_file="$RUNNER_TEMP/gpt-image-gate-response.json"
+          trap 'rm -f "$response_file"' EXIT
+
+          models_json="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
+            "$base_url/v1/models")"
+          if jq -e '.data[]? | select(.id == "gpt-image-1" or .id == "gpt-image-2")' \
+            <<<"$models_json" >/dev/null; then
+            echo "B2B model list still exposes a deferred GPT Image model" >&2
+            exit 1
+          fi
+
+          status="$(curl --silent --show-error \
+            -o "$response_file" \
+            -w '%{http_code}' \
+            -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data '{"model":"gpt-image-2","prompt":"staging catalog gate check"}' \
+            "$base_url/v1/images/generations")"
+          if [[ "$status" != 404 ]] || ! jq -e '
+            .error.code == "model_not_found" and
+            (.error.message | contains("not available for this customer group"))
+          ' "$response_file" >/dev/null; then
+            echo "B2B GPT Image request was not rejected by the pre-routing catalog gate" >&2
+            exit 1
+          fi
+
+          echo "B2B catalog gate verified: GPT Image is hidden and rejected before routing"
