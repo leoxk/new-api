@@ -149,7 +149,6 @@ jobs:
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
           DEPLOY_SSH_KNOWN_HOSTS: ${{ vars.DEPLOY_SSH_KNOWN_HOSTS }}
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          STAGING_CUSTOMER_API_KEY: ${{ secrets.STAGING_CUSTOMER_API_KEY }}
         run: |
           set -euo pipefail
 
@@ -157,7 +156,6 @@ jobs:
           : "${DEPLOY_USER:?missing staging deployment user}"
           : "${DEPLOY_SSH_KNOWN_HOSTS:?missing pinned staging host key}"
           : "${DEPLOY_SSH_PRIVATE_KEY:?missing staging deployment key}"
-          : "${STAGING_CUSTOMER_API_KEY:?missing staging customer API key}"
           ssh_dir="$RUNNER_TEMP/catalog-gate-ssh"
           tunnel_port=33100
           tunnel_pid=""
@@ -203,8 +201,24 @@ jobs:
           done
           curl --fail --silent --show-error "$base_url/api/status" >/dev/null
 
+          customer_key="$(ssh -F "$ssh_dir/config" glimo-staging \
+            "container=\$(docker ps \
+              --filter label=com.docker.compose.project=glimo-b2b-staging \
+              --filter label=com.docker.compose.service=postgres \
+              --format '{{.ID}}'); \
+             [[ -n \"\$container\" ]] || exit 1; \
+             docker exec \"\$container\" sh -lc \
+               'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -Atc \"SELECT key FROM tokens WHERE user_id=3 AND status=1 AND (unlimited_quota=true OR remain_quota>0) ORDER BY id DESC LIMIT 1;\"'")"
+          if [[ -z "$customer_key" || "$customer_key" == *$'\n'* ]]; then
+            echo "No single enabled API key is available for the controlled b2btest customer" >&2
+            exit 1
+          fi
+          if [[ "$customer_key" != sk-* ]]; then
+            customer_key="sk-$customer_key"
+          fi
+
           models_json="$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
+            -H "Authorization: Bearer $customer_key" \
             "$base_url/v1/models")"
           if jq -e '.data[]? | select(.id == "gpt-image-1" or .id == "gpt-image-2")' \
             <<<"$models_json" >/dev/null; then
@@ -216,7 +230,7 @@ jobs:
             -o "$response_file" \
             --dump-header "$headers_file" \
             --request POST \
-            -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
+            -H "Authorization: Bearer $customer_key" \
             -H "Content-Type: application/json" \
             --data '{"model":"gpt-image-2","prompt":"staging catalog gate check"}' \
             "$base_url/v1/images/generations"
