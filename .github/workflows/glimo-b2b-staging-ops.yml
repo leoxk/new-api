@@ -154,7 +154,8 @@ jobs:
           : "${STAGING_PUBLIC_HEALTH_URL:?missing staging public health URL}"
           base_url="${STAGING_PUBLIC_HEALTH_URL%/api/status}"
           response_file="$RUNNER_TEMP/gpt-image-gate-response.json"
-          trap 'rm -f "$response_file"' EXIT
+          headers_file="$RUNNER_TEMP/gpt-image-gate-headers.txt"
+          trap 'rm -f "$response_file" "$headers_file"' EXIT
 
           models_json="$(curl --fail-with-body --silent --show-error \
             -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
@@ -165,13 +166,15 @@ jobs:
             exit 1
           fi
 
-          status="$(curl --silent --show-error \
+          curl --silent --show-error \
             -o "$response_file" \
-            -w '%{http_code}' \
+            --dump-header "$headers_file" \
+            --request POST \
             -H "Authorization: Bearer $STAGING_CUSTOMER_API_KEY" \
             -H "Content-Type: application/json" \
             --data '{"model":"gpt-image-2","prompt":"staging catalog gate check"}' \
-            "$base_url/v1/images/generations")"
+            "$base_url/v1/images/generations"
+          status="$(awk '$1 ~ /^HTTP\// { code=$2 } END { print code }' "$headers_file")"
           if [[ "$status" != 404 ]] || ! jq -e '
             .error.code == "model_not_found" and
             (.error.message | contains("not available for this customer group"))
