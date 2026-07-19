@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -36,6 +37,18 @@ func Distribute() func(c *gin.Context) {
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
 			abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+			return
+		}
+		if model_setting.IsModelBlockedForUserGroup(
+			common.GetContextKeyString(c, constant.ContextKeyUserGroup),
+			modelRequest.Model,
+		) {
+			abortWithOpenAiMessage(
+				c,
+				http.StatusNotFound,
+				fmt.Sprintf("model %s is not available for this customer group", modelRequest.Model),
+				types.ErrorCodeModelNotFound,
+			)
 			return
 		}
 		if ok {

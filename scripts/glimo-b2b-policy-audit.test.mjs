@@ -62,13 +62,15 @@ test('approved catalog and pricing pass', () => {
   const result = auditSnapshot(passingSnapshot(), policy)
   assert.equal(result.ok, true)
   assert.deepEqual(result.errors, [])
-  assert.equal(result.summary.approvedModels, 10)
+  assert.equal(result.summary.approvedModels, 8)
+  assert.equal(result.summary.configuredModels, 10)
+  assert.deepEqual(result.summary.deferredModels, ['gpt-image-1', 'gpt-image-2'])
   assert.equal(result.customerRates['gpt-5.6-sol'].usdPerMillion.input, 1.5)
   assert.ok(
     Math.abs(result.customerRates['deepseek-v4-pro'].usdPerMillion.output - 0.957) <
       1e-12,
   )
-  assert.equal(result.customerRates['gpt-image-2'].usdPerMillion.imageOutput, 9)
+  assert.equal(result.customerRates['gpt-image-2'], undefined)
 })
 
 test('stale ten-percent b2b ratio fails loudly', () => {

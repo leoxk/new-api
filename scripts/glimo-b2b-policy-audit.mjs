@@ -193,8 +193,14 @@ export function auditSnapshot(snapshot, policy) {
     )
   }
 
+  const commercialModels = Object.entries(policy.models).filter(
+    ([, model]) => model.commerciallyEnabled !== false,
+  )
+  const deferredModels = Object.entries(policy.models).filter(
+    ([, model]) => model.commerciallyEnabled === false,
+  )
   const customerRates = Object.fromEntries(
-    Object.entries(policy.models).map(([name, model]) => [
+    commercialModels.map(([name, model]) => [
       name,
       {
         category: model.category,
@@ -211,7 +217,9 @@ export function auditSnapshot(snapshot, policy) {
     errors,
     warnings,
     summary: {
-      approvedModels: Object.keys(policy.models).length,
+      approvedModels: commercialModels.length,
+      configuredModels: Object.keys(policy.models).length,
+      deferredModels: deferredModels.map(([name]) => name),
       b2bUsers: snapshot.b2bUserCount ?? 0,
       b2bTokens: snapshot.b2bTokenCount ?? 0,
     },
@@ -223,7 +231,7 @@ function renderText(result) {
   const lines = [
     `Glimo B2B policy ${result.policyVersion}: ${result.ok ? 'PASS' : 'FAIL'}`,
     `Snapshot: ${result.capturedAt ?? 'unknown'}`,
-    `Models: ${result.summary.approvedModels}; B2B users: ${result.summary.b2bUsers}; B2B tokens: ${result.summary.b2bTokens}`,
+    `Commercial models: ${result.summary.approvedModels}; configured models: ${result.summary.configuredModels}; deferred: ${result.summary.deferredModels.join(', ') || 'none'}; B2B users: ${result.summary.b2bUsers}; B2B tokens: ${result.summary.b2bTokens}`,
   ]
   for (const error of result.errors) lines.push(`ERROR: ${error}`)
   for (const warning of result.warnings) lines.push(`WARN: ${warning}`)

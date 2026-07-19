@@ -59,9 +59,9 @@ curl https://llm.glimolab.com/v1/responses \
 ```
 
 endpoint 以登录后的 Model Catalog 为准：文本模型通常使用
-`/v1/chat/completions`，已标记的 GPT 模型也可使用 `/v1/responses`；图像生成和编辑分别使用目录中已验证的 `/v1/images/generations` 与 `/v1/images/edits`。未在目录中标记的 endpoint 不属于承诺范围。
+`/v1/chat/completions`，已标记的 GPT 模型也可使用 `/v1/responses`。未在目录中标记的 endpoint 不属于承诺范围。
 
-GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Catalog 中标记为已验证的项目为准。不要假设上游支持但目录未标记的组合可用。
+Pilot 阶段暂不向 B2B 客户开放 GPT Image。`gpt-image-1`、`gpt-image-2` 会在能够验证实际图像 usage、模型映射和每个开放 size/quality 价格后另行启用。
 
 ## 批准的模型目录
 
@@ -69,7 +69,8 @@ GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Cata
 |---|---|---|
 | GPT Text & Reasoning | `gpt-5.4`、`gpt-5.4-mini`、`gpt-5.5`、`gpt-5.6-luna`、`gpt-5.6-terra`、`gpt-5.6-sol` | OpenAI Standard / Short context 对应参考价的 30% |
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | DeepSeek 官方 API 基础价 × 1.10（含税费与支付成本覆盖） |
-| GPT Image | `gpt-image-1`、`gpt-image-2` | OpenAI Standard 图像对应参考价的 30% |
+
+暂缓模型：`gpt-image-1`、`gpt-image-2`。现有内部 GPT Image channel 保留，但不属于当前 B2B Pilot 目录。
 
 `codex-auto-review`、`dall-e-3`、OpenAI Long context、Batch、Flex、Priority 以及其他未批准模型不属于 B2B 产品。模型目录和有效价格以登录后的私有客户控制台及销售报价为准；公开网站不展示详细倍率或费率表。
 
