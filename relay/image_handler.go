@@ -44,6 +44,21 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	}
 	adaptor.Init(info)
 
+	// Token-priced B2B GPT Image streams cannot be validated before image
+	// chunks have already reached the customer. Require a fixed-price policy
+	// for streaming; non-stream responses are validated against upstream usage
+	// by the OpenAI response handler before any image bytes are forwarded.
+	if info.IsStream && !info.PriceData.UsePrice &&
+		(info.UserGroup == "b2b" || info.UsingGroup == "b2b") &&
+		strings.HasPrefix(info.OriginModelName, "gpt-image-") {
+		return types.NewErrorWithStatusCode(
+			fmt.Errorf("B2B GPT Image streaming is unavailable until verifiable image billing is configured"),
+			types.ErrorCodeModelPriceError,
+			http.StatusServiceUnavailable,
+			types.ErrOptionWithSkipRetry(),
+		)
+	}
+
 	var requestBody io.Reader
 
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
