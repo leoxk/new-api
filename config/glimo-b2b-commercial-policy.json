@@ -8,7 +8,7 @@
   },
   "groups": {
     "b2b": {
-      "usageRatio": 0.1,
+      "usageRatio": 0.3,
       "topupRatio": 1
     },
     "b2b-deepseek": {

@@ -12,6 +12,7 @@ WITH selected_options AS (
     'ModelRatio',
     'TopupGroupRatio',
     'UserUsableGroups',
+    'group_ratio_setting.group_ratio',
     'group_ratio_setting.group_special_usable_group'
   )
 ), selected_abilities AS (

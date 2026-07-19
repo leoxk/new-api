@@ -67,9 +67,9 @@ GPT Image 的开放 endpoint、size 和 quality 组合只以登录后 Model Cata
 
 | 类别 | 模型 | 客户计价基础 |
 |---|---|---|
-| GPT Text & Reasoning | `gpt-5.4`、`gpt-5.4-mini`、`gpt-5.5`、`gpt-5.6-luna`、`gpt-5.6-terra`、`gpt-5.6-sol` | OpenAI Standard / Short context 对应参考价的 10% |
+| GPT Text & Reasoning | `gpt-5.4`、`gpt-5.4-mini`、`gpt-5.5`、`gpt-5.6-luna`、`gpt-5.6-terra`、`gpt-5.6-sol` | OpenAI Standard / Short context 对应参考价的 30% |
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | DeepSeek 官方 API 基础价 × 1.10（含税费与支付成本覆盖） |
-| GPT Image | `gpt-image-1`、`gpt-image-2` | OpenAI Standard 图像对应参考价的 10% |
+| GPT Image | `gpt-image-1`、`gpt-image-2` | OpenAI Standard 图像对应参考价的 30% |
 
 `codex-auto-review`、`dall-e-3`、OpenAI Long context、Batch、Flex、Priority 以及其他未批准模型不属于 B2B 产品。模型目录和有效价格以登录后的私有客户控制台及销售报价为准；公开网站不展示详细倍率或费率表。
 

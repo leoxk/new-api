@@ -25,9 +25,9 @@
 
 支付启用前逐项复核并保存证据；任何生产价格变更仍须 Leo 明确批准：
 
-- 6 个 GPT 文本/推理模型只采用 OpenAI Standard / Short context；input、cached input、cache write、output、reasoning 分别核对，最终有效倍率为 `0.1`。
+- 6 个 GPT 文本/推理模型只采用 OpenAI Standard / Short context；input、cached input、cache write、output、reasoning 分别核对，标准外部客户有效倍率为 `0.3`。
 - 2 个 DeepSeek 模型的 base rate 分别等于官方 cache hit、cache miss/input、output 价格，再应用内部组 `b2b-deepseek=1.10`，用于覆盖税费和支付成本。
-- 2 个 GPT Image 模型按实际开放的 endpoint、size、quality、input image 与 output token/图片维度逐项核对，倍率为 `0.1`。
+- 2 个 GPT Image 模型按实际开放的 endpoint、size、quality、input image 与 output token/图片维度逐项核对，标准外部客户倍率为 `0.3`。
 - `TopupGroupRatio` 中 `b2b` 与 `b2b-deepseek` 均保持 `1.0`；DeepSeek 的 1.10 只作用于调用扣费，不作用于充值价值。
 
 保存官方价格来源 URL、核对日期、New API 配置导出和最小测试扣费证据。未批准前不得改生产价格。
@@ -64,7 +64,7 @@ Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不
 
 ## 路由和异常处理
 
-- GPT/GPT Image 应记录实际 group=`b2b`、group ratio=`0.1`。
+- GPT/GPT Image 标准外部客户应记录实际 group=`b2b`、group ratio=`0.3`。
 - DeepSeek 应记录实际 group=`b2b-deepseek`、group ratio=`1.10`，并在内部对账中同时保留官方 base rate、10% 成本覆盖和最终扣费。
 - 日志至少核对客户、API Key、模型、实际 group、group ratio、token/image 维度、quota、request ID、时间和状态。
 - 错路由时先暂停受影响模型 ability，不修改 DeepSeek 生产 channel；保留日志后回滚最近配置或代码版本。
@@ -77,4 +77,4 @@ Chargeback 确认后按同一人工流程登记；如当前 Recharge Balance 不
 
 按客户、API Key、模型类别、单模型、`b2b`/`b2b-deepseek`、日期、成功/失败导出请求数、token/image 数量和费用。Recharge/Promotional 分类只按资金来源计算，不按模型类别或倍率重新分类。
 
-客户销售报价和登录后私有费率卡可说明 DeepSeek 为“官方 API 基础价 × 1.10，含税费与支付成本覆盖”。公开网站继续只描述可用模型和 B2B 服务能力，不公开详细倍率、内部组名或完整费率表。
+客户销售报价和登录后费率卡可说明 GPT/GPT Image 为对应官方 Standard 参考价的 30%，DeepSeek 为“官方 API 基础价 × 1.10，含税费与支付成本覆盖”。公开网站和公开销售 Slides 可发布标准 30%/110% 规则，但不得公开内部组名、逐模型映射、25% 常规议价底线或 20% 绝对底线。

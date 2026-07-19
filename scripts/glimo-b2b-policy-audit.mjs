@@ -72,6 +72,7 @@ export function auditSnapshot(snapshot, policy) {
   const warnings = []
   const options = snapshot.options ?? {}
   const groupRatio = options.GroupRatio ?? {}
+  const nestedGroupRatio = options['group_ratio_setting.group_ratio'] ?? {}
   const topupGroupRatio = options.TopupGroupRatio ?? {}
 
   for (const [group, expected] of Object.entries(policy.groups)) {
@@ -79,6 +80,12 @@ export function auditSnapshot(snapshot, policy) {
       errors,
       `GroupRatio.${group}`,
       groupRatio[group],
+      expected.usageRatio,
+    )
+    addNumericCheck(
+      errors,
+      `group_ratio_setting.group_ratio.${group}`,
+      nestedGroupRatio[group],
       expected.usageRatio,
     )
     addNumericCheck(
