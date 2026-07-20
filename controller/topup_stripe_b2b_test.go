@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v81"
 	"github.com/stripe/stripe-go/v81/webhook"
@@ -260,4 +261,42 @@ func TestStripeMinimumTopUpRejectsNineAndAcceptsTen(t *testing.T) {
 	accepted := invokeStripeAmountRequest(t, user.Id, 10)
 	assert.Contains(t, accepted, `"message":"success"`)
 	assert.Contains(t, accepted, `"10.00"`)
+}
+
+func TestB2BTopUpInfoSurfacesOnlyStripe(t *testing.T) {
+	setupB2BControllerTestDB(t)
+	configureStripeWebhookTest(t)
+
+	originalPayMethods := operation_setting.PayMethods
+	operation_setting.PayMethods = []map[string]string{
+		{"name": "支付宝", "type": "alipay"},
+		{"name": "微信", "type": "wxpay"},
+		{"name": "自定义1", "type": "custom"},
+	}
+	t.Cleanup(func() { operation_setting.PayMethods = originalPayMethods })
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/user/topup/info", nil)
+	GetTopUpInfo(ctx)
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			EnableOnlineTopUp bool                `json:"enable_online_topup"`
+			EnableStripeTopUp bool                `json:"enable_stripe_topup"`
+			PayMethods         []map[string]string `json:"pay_methods"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	require.False(t, response.Data.EnableOnlineTopUp)
+	require.True(t, response.Data.EnableStripeTopUp)
+	require.Equal(t, []map[string]string{{
+		"name":      "Stripe",
+		"type":      model.PaymentMethodStripe,
+		"color":     "rgba(var(--semi-purple-5), 1)",
+		"min_topup": "10",
+	}}, response.Data.PayMethods)
 }
