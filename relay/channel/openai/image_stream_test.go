@@ -66,7 +66,7 @@ func TestOpenaiImageDoResponseUsesInfoIsStream(t *testing.T) {
 	})
 }
 
-func TestOpenaiImageHandlerFailsClosedForUnpricedB2BUsage(t *testing.T) {
+func TestOpenaiImageHandlerAllowsUnpricedB2BUsage(t *testing.T) {
 	oldMode := gin.Mode()
 	gin.SetMode(gin.TestMode)
 	t.Cleanup(func() { gin.SetMode(oldMode) })
@@ -79,11 +79,9 @@ func TestOpenaiImageHandlerFailsClosedForUnpricedB2BUsage(t *testing.T) {
 
 	usage, err := OpenaiImageHandler(c, info, resp)
 
-	require.Nil(t, usage)
-	require.NotNil(t, err)
-	require.Equal(t, http.StatusBadGateway, err.StatusCode)
-	require.Equal(t, "model_price_error", string(err.GetErrorCode()))
-	require.Empty(t, recorder.Body.String(), "unbilled image bytes must not reach the customer")
+	require.Nil(t, err)
+	require.NotNil(t, usage)
+	require.Equal(t, body, recorder.Body.String())
 }
 
 func TestOpenaiImageHandlerAllowsVerifiedB2BUsage(t *testing.T) {

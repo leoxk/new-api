@@ -29,21 +29,6 @@ func updateOpenAIImageCount(info *relaycommon.RelayInfo, count int64) {
 	info.PriceData.AddOtherRatio("n", float64(count))
 }
 
-func validateB2BImageBilling(info *relaycommon.RelayInfo, usage *dto.Usage) *types.NewAPIError {
-	if info == nil || info.PriceData.UsePrice ||
-		(info.UserGroup != "b2b" && info.UsingGroup != "b2b") ||
-		!strings.HasPrefix(info.OriginModelName, "gpt-image-") ||
-		service.ValidUsage(usage) {
-		return nil
-	}
-	return types.NewErrorWithStatusCode(
-		fmt.Errorf("B2B GPT Image response did not include verifiable image usage; billing was not completed"),
-		types.ErrorCodeModelPriceError,
-		http.StatusBadGateway,
-		types.ErrOptionWithSkipRetry(),
-	)
-}
-
 // OpenaiImageHandler handles non-streaming OpenAI image responses
 // (generations/edits), returning the parsed usage for billing.
 func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
@@ -64,9 +49,6 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
 	normalizeOpenAIUsage(&usageResp.Usage)
-	if billingError := validateB2BImageBilling(info, &usageResp.Usage); billingError != nil {
-		return nil, billingError
-	}
 
 	updateOpenAIImageCount(info, gjson.GetBytes(responseBody, "data.#").Int())
 
@@ -269,9 +251,6 @@ func openaiImageJSONAsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo,
 	}
 	normalizeOpenAIUsage(&usageResp.Usage)
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
-	if billingError := validateB2BImageBilling(info, &usageResp.Usage); billingError != nil {
-		return nil, billingError
-	}
 
 	imageCount := gjson.GetBytes(responseBody, "data.#").Int()
 	updateOpenAIImageCount(info, imageCount)
