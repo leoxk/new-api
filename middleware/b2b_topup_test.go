@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -15,12 +18,46 @@ import (
 
 func setupB2BTopUpMiddlewareDB(t *testing.T) {
 	t.Helper()
+	previousIsMasterNode := common.IsMasterNode
+	previousSQLitePath := common.SQLitePath
+	previousMainDatabaseType := common.MainDatabaseType()
+	previousLogDatabaseType := common.LogDatabaseType()
+	previousRedisEnabled := common.RedisEnabled
+	previousSQLDSN, hadSQLDSN := os.LookupEnv("SQL_DSN")
 	previousDB := model.DB
+
+	common.IsMasterNode = false
+	common.SQLitePath = fmt.Sprintf("file:%s_init?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	common.RedisEnabled = false
+	require.NoError(t, os.Setenv("SQL_DSN", "local"))
+	require.NoError(t, model.InitDB())
+	initializedDB := model.DB
+
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&model.User{}))
 	model.DB = db
-	t.Cleanup(func() { model.DB = previousDB })
+	t.Cleanup(func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+		if initializedDB != nil {
+			if sqlDB, err := initializedDB.DB(); err == nil {
+				_ = sqlDB.Close()
+			}
+		}
+		model.DB = previousDB
+		common.IsMasterNode = previousIsMasterNode
+		common.SQLitePath = previousSQLitePath
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		common.RedisEnabled = previousRedisEnabled
+		if hadSQLDSN {
+			require.NoError(t, os.Setenv("SQL_DSN", previousSQLDSN))
+		} else {
+			require.NoError(t, os.Unsetenv("SQL_DSN"))
+		}
+	})
 }
 
 func performB2BTopUpRequest(t *testing.T, group string) *httptest.ResponseRecorder {
