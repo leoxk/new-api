@@ -41,7 +41,7 @@ func configureStripeWebhookTest(t *testing.T) {
 	setting.StripeApiSecret = "sk_test_glimo_b2b"
 	setting.StripeWebhookSecret = stripeWebhookTestSecret
 	setting.StripePriceId = "price_glimo_b2b_test"
-	setting.StripeMinTopUp = 20
+	setting.StripeMinTopUp = 10
 	setting.StripeUnitPrice = 1
 }
 
@@ -247,17 +247,17 @@ func TestStripeWebhookRejectsAmountAndCurrencyMismatchWithoutCrediting(t *testin
 	}
 }
 
-func TestStripeMinimumTopUpRejectsNineteenAndAcceptsTwenty(t *testing.T) {
+func TestStripeMinimumTopUpRejectsNineAndAcceptsTen(t *testing.T) {
 	setupB2BControllerTestDB(t)
 	configureStripeWebhookTest(t)
 	user := &model.User{Username: "stripe-minimum", Group: "b2b", Status: common.UserStatusEnabled, AffCode: "stripe-minimum"}
 	require.NoError(t, model.DB.Create(user).Error)
 
-	rejected := invokeStripeAmountRequest(t, user.Id, 19)
+	rejected := invokeStripeAmountRequest(t, user.Id, 9)
 	assert.Contains(t, rejected, `"message":"error"`)
-	assert.Contains(t, rejected, "20")
+	assert.Contains(t, rejected, "10")
 
-	accepted := invokeStripeAmountRequest(t, user.Id, 20)
+	accepted := invokeStripeAmountRequest(t, user.Id, 10)
 	assert.Contains(t, accepted, `"message":"success"`)
-	assert.Contains(t, accepted, `"20.00"`)
+	assert.Contains(t, accepted, `"10.00"`)
 }
