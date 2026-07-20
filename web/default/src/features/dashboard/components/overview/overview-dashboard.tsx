@@ -50,6 +50,7 @@ import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { getUserModels } from '@/lib/api'
 import { MOTION_TRANSITION } from '@/lib/motion'
 import { ROLE } from '@/lib/roles'
@@ -473,6 +474,7 @@ export function OverviewDashboard() {
   const remainQuota = Number(user?.quota ?? 0)
   const usedQuota = Number(user?.used_quota ?? 0)
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
+  const isWalletVisible = useIsSidebarModuleVisible('/wallet')
 
   const apiKeysQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'api-keys'],
@@ -497,8 +499,8 @@ export function OverviewDashboard() {
     [apiKeysQuery.data]
   )
 
-  const startSteps = useMemo<StartStep[]>(
-    () => [
+  const startSteps = useMemo<StartStep[]>(() => {
+    const steps: StartStep[] = [
       {
         title: t('Create API Key'),
         description: t('Create a key for your app or service'),
@@ -520,9 +522,9 @@ export function OverviewDashboard() {
         icon: TerminalSquare,
         completed: requestCount > 0,
       },
-    ],
-    [preferredKey, remainQuota, requestCount, t, usedQuota]
-  )
+    ]
+    return steps.filter((step) => step.to !== '/wallet' || isWalletVisible)
+  }, [isWalletVisible, preferredKey, remainQuota, requestCount, t, usedQuota])
 
   const quickActions = useMemo<QuickAction[]>(
     () => [

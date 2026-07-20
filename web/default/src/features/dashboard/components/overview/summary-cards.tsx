@@ -28,6 +28,7 @@ import { getUserQuotaDates } from '@/features/dashboard/api'
 import { useSummaryCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { useStatus } from '@/hooks/use-status'
+import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
@@ -140,6 +141,7 @@ export function SummaryCards() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.auth.user)
   const { status, loading } = useStatus()
+  const isWalletVisible = useIsSidebarModuleVisible('/wallet')
 
   const summaryTimeRange = useMemo(() => computeTimeRange(1), [])
   const remainQuota = Number(user?.quota ?? 0)
@@ -344,10 +346,12 @@ export function SummaryCards() {
             </div>
           </div>
 
-          <Button className='justify-between' render={<Link to='/wallet' />}>
-            <span>{t('Wallet')}</span>
-            <ArrowRight data-icon='inline-end' />
-          </Button>
+          {isWalletVisible && (
+            <Button className='justify-between' render={<Link to='/wallet' />}>
+              <span>{t('Wallet')}</span>
+              <ArrowRight data-icon='inline-end' />
+            </Button>
+          )}
         </div>
       </div>
     </div>
