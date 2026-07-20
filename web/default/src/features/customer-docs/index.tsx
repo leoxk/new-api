@@ -38,6 +38,11 @@ const approvedModels = [
     models: 'deepseek-v4-flash, deepseek-v4-pro',
     pricing: 'Official DeepSeek API base rate × 1.10',
   },
+  {
+    category: 'GPT Image',
+    models: 'gpt-image-1, gpt-image-2',
+    pricing: '30% of the matching OpenAI reference rate',
+  },
 ]
 
 function CodeBlock({ code }: { code: string }) {
@@ -181,12 +186,10 @@ console.log(response.choices[0].message.content)`
                 </div>
               ))}
               <p className='text-muted-foreground text-sm'>
-                Temporarily unavailable for B2B: gpt-image-1 and gpt-image-2,
-                pending verifiable image usage and model mapping. Not included:
-                codex-auto-review, dall-e-3, OpenAI long-context, Batch, Flex,
-                Priority, and any model not shown in the signed-in catalog.
-                Current effective prices in the private catalog and approved
-                sales quote take precedence.
+                Not included: codex-auto-review, dall-e-3, OpenAI long-context,
+                Batch, Flex, Priority, and any model not shown in the signed-in
+                catalog. Current effective prices in the private catalog and
+                approved sales quote take precedence.
               </p>
             </CardContent>
           </Card>

@@ -4,7 +4,7 @@
 
 - `staging-llm.glimolab.com` 是支付专用 staging：独立 PostgreSQL、Redis、容器、网络和 volumes，只验证 Stripe、Wallet、兑换码、退款登记及客户/运营界面。
 - 支付 staging 不注入生产 channel、上游密钥或伪造 abilities。Model Square 显示 0 models 属于环境边界，不代表生产目录为空。
-- 8 个当前 Pilot 文本模型的成功调用、真实 endpoint、路由倍率和扣费验收必须在另一个具有独立测试上游凭据的集成环境完成，或在单独批准的生产 canary 中完成。两个 GPT Image 模型应验证为不可见且返回 model-not-available。
+- 10 个当前 Pilot 模型的成功调用、真实 endpoint、路由倍率和扣费验收必须在另一个具有独立测试上游凭据的集成环境完成，或在单独批准的生产 canary 中完成。两个 GPT Image 模型应在 B2B 目录可见并通过真实图片调用。
 - 不得为了让支付 staging 的目录“看起来完整”而创建不可调用的假 channel；这会产生错误的客户预期。
 
 ## 验收证据
@@ -18,9 +18,9 @@
 
 以下矩阵分为支付 staging 与模型集成环境两部分。支付 staging 完成第 4 至第 7 项及界面验证；模型集成环境完成第 1 至第 3 项：
 
-1. 8 个当前批准文本模型各完成一次成功调用，记录 request ID、实际路由组、倍率和扣费。
+1. 10 个当前批准模型各完成一次成功调用，记录 request ID、实际路由组、倍率和扣费。
 2. `codex-auto-review`、`dall-e-3` 和一个任意未批准模型返回 model-not-available，且无 default 回退。
-3. GPT 文本分别覆盖 input、cached input、cache write、output、reasoning并验证标准外部客户 `b2b=0.3`；DeepSeek 覆盖 cache hit/miss/output并验证官方 base rate × `b2b-deepseek=1.10`；`gpt-image-1` 与 `gpt-image-2` 在 B2B `/v1/models` 中不可见且调用返回 `model_not_found`。
+3. GPT 文本分别覆盖 input、cached input、cache write、output、reasoning并验证标准外部客户 `b2b=0.3`；DeepSeek 覆盖 cache hit/miss/output并验证官方 base rate × `b2b-deepseek=1.10`；`gpt-image-1` 与 `gpt-image-2` 在 B2B `/v1/models` 中可见，并各完成一次真实图片调用。
 4. Stripe Test Mode 覆盖成功、取消、失败、延迟、重复 webhook、金额不符和币种不符；PayPal 不属于当前商业和验收范围。
 5. 验证 US$20 最低充值：US$19 请求被拒绝，US$20 Checkout 与 Recharge Balance 按 1:1 处理，快捷充值选项不出现低于 US$20 的金额。
 6. 覆盖只有现金、只有促销、混合余额、部分消费、全额/部分人工退款和重复退款登记；Pilot 退款不从客户金额中扣除 Stripe 原交易手续费。

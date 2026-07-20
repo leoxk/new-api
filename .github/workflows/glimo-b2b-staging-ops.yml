@@ -10,7 +10,7 @@ on:
         options:
           - record_completed_stripe_refund
           - sync_b2b_catalog_policy
-          - verify_b2b_catalog_gate
+          - verify_b2b_image_authorization
       trade_no:
         description: Exact New API staging top-up order number
         required: false
@@ -288,12 +288,12 @@ jobs:
 
           echo "Staging B2B catalog policy synchronized without exposing internal groups globally"
 
-  verify-b2b-catalog-gate:
-    if: ${{ inputs.operation == 'verify_b2b_catalog_gate' }}
+  verify-b2b-image-authorization:
+    if: ${{ inputs.operation == 'verify_b2b_image_authorization' }}
     runs-on: ubuntu-latest
     environment: glimo-gateway-staging
     steps:
-      - name: Verify B2B GPT Image is hidden and rejected before routing
+      - name: Verify B2B GPT Image authorization is enabled
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
@@ -357,6 +357,15 @@ jobs:
           done
           curl --fail --silent --show-error "$base_url/api/status" >/dev/null
 
+          ssh -F "$ssh_dir/config" glimo-staging \
+            "container=\$(docker ps \
+              --filter label=com.docker.compose.project=glimo-b2b-staging \
+              --filter label=com.docker.compose.service=new-api \
+              --format '{{.ID}}'); \
+             [[ -n \"\$container\" ]] || exit 1; \
+             docker inspect \"\$container\" --format '{{range .Config.Env}}{{println .}}{{end}}' | \
+               grep -qx 'GLIMO_B2B_GPT_IMAGE_ENABLED=true'"
+
           customer_key="$(ssh -F "$ssh_dir/config" glimo-staging \
             "container=\$(docker ps \
               --filter label=com.docker.compose.project=glimo-b2b-staging \
@@ -392,28 +401,21 @@ jobs:
             echo "B2B model-list authentication failed: HTTP $models_status, code=$error_code, category=$error_category" >&2
             exit 1
           fi
-          models_json="$(<"$models_response_file")"
-          if jq -e '.data[]? | select(.id == "gpt-image-1" or .id == "gpt-image-2")' \
-            <<<"$models_json" >/dev/null; then
-            echo "B2B model list still exposes a deferred GPT Image model" >&2
-            exit 1
-          fi
-
           curl --silent --show-error \
             -o "$response_file" \
             --dump-header "$headers_file" \
             --request POST \
             -H "Authorization: Bearer $customer_key" \
             -H "Content-Type: application/json" \
-            --data '{"model":"gpt-image-2","prompt":"staging catalog gate check"}' \
+            --data '{"model":"gpt-image-2","prompt":"staging authorization check","n":999}' \
             "$base_url/v1/images/generations"
           status="$(awk '$1 ~ /^HTTP\// { code=$2 } END { print code }' "$headers_file")"
-          if [[ "$status" != 404 ]] || ! jq -e '
+          if [[ "$status" == 404 ]] && jq -e '
             .error.code == "model_not_found" and
             (.error.message | contains("not available for this customer group"))
           ' "$response_file" >/dev/null; then
-            echo "B2B GPT Image request was not rejected by the pre-routing catalog gate" >&2
+            echo "B2B GPT Image request is still rejected by the customer-group catalog gate" >&2
             exit 1
           fi
 
-          echo "B2B catalog gate verified: GPT Image is hidden and rejected before routing"
+          echo "B2B GPT Image authorization verified: the customer-group catalog gate is open"

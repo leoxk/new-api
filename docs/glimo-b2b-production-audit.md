@@ -1,6 +1,6 @@
 # Glimo AI Gateway B2B 生产配置只读审计
 
-本审计器把 10 个已配置模型、当前 8 模型商业目录、官方基础价格维度、客户倍率、充值倍率、自动路由和禁止回退规则固化为代码。它只读取数据库，不修改 option、用户、token、channel、ability、价格或余额。GPT Image 的 B2B 运行时禁用还必须通过 `/v1/models` 和拒绝调用测试验证，不能仅凭 ability 快照判断。
+本审计器把 10 模型商业目录、官方基础价格维度、客户倍率、充值倍率、自动路由和禁止回退规则固化为代码。它只读取数据库，不修改 option、用户、token、channel、ability、价格或余额。GPT Image 的 B2B 运行时授权还必须通过 `/v1/models` 和图片调用测试验证，不能仅凭 ability 快照判断。
 
 ## 执行
 
@@ -19,13 +19,13 @@ ssh root@vps-oci-sgp.leocoral.com \
 
 - `GroupRatio` 与 `group_ratio_setting.group_ratio` 都必须是标准外部客户 `b2b=0.3`、`b2b-deepseek=1.1`；
 - 两组 `TopupGroupRatio=1.0`；
-- `b2b` 的底层配置仍包含 6 个 GPT 文本模型和 2 个 GPT Image 模型，但当前商业目录只开放 6 个 GPT 文本模型；
+- `b2b` 商业目录包含 6 个 GPT 文本模型和 2 个 GPT Image 模型；
 - `b2b-deepseek` 恰好包含 2 个 DeepSeek 模型；
 - `codex-auto-review`、`dall-e-3` 和其他模型没有进入两组；
 - ability 和对应 channel 均启用；
 - 6 个 GPT 文本的 Standard/Short input、cached input、cache write 和 output 映射；
 - DeepSeek 官方 cache hit、cache miss 和 output base rate；
-- GPT Image 的历史价格映射保留供后续重新验证，但当前不得出现在 B2B 客户目录或产生成功请求；
+- GPT Image 的价格映射、B2B 目录可见性和成功请求必须保持一致；
 - B2B token 使用 `auto`，并关闭跨组重试；
 - B2B 内部组不在普通用户可选列表中，且没有 `default` 正向回退。
 
