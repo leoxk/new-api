@@ -112,7 +112,7 @@ console.log(response.choices[0].message.content)`
         <div className='mx-auto max-w-5xl space-y-6 pb-12'>
           <p className='text-muted-foreground text-sm'>
             OpenAI-compatible quickstart, approved catalog, billing, security,
-            and support for Glimo AI Gateway B2B customers.
+            and support for GlimoLab AI Gateway B2B customers.
           </p>
           <Alert>
             <AlertCircle />
@@ -232,7 +232,7 @@ console.log(response.choices[0].message.content)`
                   Request a refund or company invoice through Refund & Support
                   in Wallet, or email{' '}
                   <a
-                    href='mailto:contact@glimolab.com?subject=Glimo%20AI%20Gateway%20support%20request'
+                    href='mailto:contact@glimolab.com?subject=GlimoLab%20AI%20Gateway%20support%20request'
                     className='text-primary font-medium underline-offset-4 hover:underline'
                   >
                     contact@glimolab.com
@@ -257,7 +257,7 @@ console.log(response.choices[0].message.content)`
                 Usage Logs can be filtered by API key, model, date, status, and
                 request ID. Send the request ID to{' '}
                 <a
-                  href='mailto:contact@glimolab.com?subject=Glimo%20AI%20Gateway%20support%20request'
+                  href='mailto:contact@glimolab.com?subject=GlimoLab%20AI%20Gateway%20support%20request'
                   className='text-primary font-medium underline-offset-4 hover:underline'
                 >
                   contact@glimolab.com

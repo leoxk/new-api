@@ -1,4 +1,4 @@
-# Glimo AI Gateway B2B 运营 SOP
+# GlimoLab AI Gateway B2B 运营 SOP
 
 ## 不可越过的边界
 

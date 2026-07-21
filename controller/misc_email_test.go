@@ -25,8 +25,8 @@ func TestEmailVerificationMessageLocalizesByLanguage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			subject, body := emailVerificationMessage(tt.lang, "Glimo Lab AI Gateway", "123456", 10)
-			assert.Contains(t, subject, "Glimo Lab AI Gateway")
+			subject, body := emailVerificationMessage(tt.lang, "GlimoLab AI Gateway", "123456", 10)
+			assert.Contains(t, subject, "GlimoLab AI Gateway")
 			assert.Contains(t, subject, tt.subjectText)
 			assert.Contains(t, body, tt.bodyText)
 			assert.Contains(t, body, "123456")
@@ -51,7 +51,7 @@ func TestPasswordResetMessageLocalizesByLanguage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.lang, func(t *testing.T) {
-			subject, body := passwordResetMessage(tt.lang, "Glimo Lab AI Gateway", link, 10)
+			subject, body := passwordResetMessage(tt.lang, "GlimoLab AI Gateway", link, 10)
 			assert.Contains(t, subject, tt.subjectText)
 			assert.Contains(t, body, tt.bodyText)
 			assert.Contains(t, body, link)

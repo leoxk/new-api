@@ -1,4 +1,4 @@
-name: Glimo B2B staging operations
+name: GlimoLab AI Gateway - B2B staging operations
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-# Glimo AI Gateway B2B 生产配置只读审计
+# GlimoLab AI Gateway B2B 生产配置只读审计
 
 本审计器把 10 个已配置模型、当前 8 模型商业目录、官方基础价格维度、客户倍率、充值倍率、自动路由和禁止回退规则固化为代码。它只读取数据库，不修改 option、用户、token、channel、ability、价格或余额。GPT Image 的 B2B 运行时禁用还必须通过 `/v1/models` 和拒绝调用测试验证，不能仅凭 ability 快照判断。
 
