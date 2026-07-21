@@ -41,6 +41,8 @@ func TestGetAIUsageBuildsPublicResponse(t *testing.T) {
 
 	user := model.User{Username: "leo", Password: "test-password", Status: 1, Role: 1}
 	require.NoError(t, model.DB.Create(&user).Error)
+	key := model.Token{UserId: user.Id, Key: "first-key", Name: "first"}
+	require.NoError(t, model.DB.Create(&key).Error)
 	capacityPath := filepath.Join(t.TempDir(), "last-good.json")
 	require.NoError(t, os.WriteFile(capacityPath, []byte(`{
 		"fiveHour":{"usedPercent":20,"resetAt":2000000100},
@@ -48,16 +50,24 @@ func TestGetAIUsageBuildsPublicResponse(t *testing.T) {
 	}`), 0o600))
 	t.Setenv("AI_USAGE_CAPACITY_PATH", capacityPath)
 	now := time.Unix(2_000_000_000, 0).UTC()
+	require.NoError(t, model.LOG_DB.Create(&model.Log{
+		UserId: user.Id, CreatedAt: now.Unix(), Type: model.LogTypeConsume,
+		TokenId: key.Id, ModelName: "gpt-test", PromptTokens: 80, CompletionTokens: 20,
+		Other: `{"cache_tokens":60}`,
+	}).Error)
 
 	response, err := GetAIUsage("leo", now)
 	require.NoError(t, err)
-	assert.Equal(t, 3, response.SchemaVersion)
+	assert.Equal(t, 4, response.SchemaVersion)
 	assert.Equal(t, AIUsageUser{UserID: user.Id, Username: "leo"}, response.User)
 	assert.Equal(t, now.Format(time.RFC3339Nano), response.GeneratedAt)
 	assert.Equal(t, now.Format(time.RFC3339Nano), response.HistoryStartedAt)
 	assert.False(t, response.Stale)
-	assert.NotNil(t, response.Keys)
-	assert.Empty(t, response.Keys)
+	require.Len(t, response.Keys, 1)
+	assert.Equal(t, float64(75), response.Keys[0].CacheHitRate7D)
+	assert.Equal(t, []AIUsageModel{{
+		ModelName: "gpt-test", Tokens7D: 100, Percentage: 100,
+	}}, response.Keys[0].ModelDistribution7D)
 	require.NotNil(t, response.CodexCapacity.FiveHour)
 	assert.Equal(t, float64(80), response.CodexCapacity.FiveHour.RemainingPercent)
 	assert.Equal(t, time.Unix(2_000_000_100, 0).UTC().Format(time.RFC3339Nano), response.CodexCapacity.FiveHour.ResetAt)

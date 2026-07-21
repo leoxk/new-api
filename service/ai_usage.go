@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -41,11 +42,19 @@ type AIUsageUser struct {
 }
 
 type AIUsageKey struct {
-	KeyID     int    `json:"key_id"`
-	KeyLabel  string `json:"key_label"`
-	Tokens1D  int64  `json:"tokens_1d"`
-	Tokens7D  int64  `json:"tokens_7d"`
-	Tokens30D int64  `json:"tokens_30d"`
+	KeyID               int            `json:"key_id"`
+	KeyLabel            string         `json:"key_label"`
+	Tokens1D            int64          `json:"tokens_1d"`
+	Tokens7D            int64          `json:"tokens_7d"`
+	Tokens30D           int64          `json:"tokens_30d"`
+	CacheHitRate7D      float64        `json:"cache_hit_rate_7d"`
+	ModelDistribution7D []AIUsageModel `json:"model_distribution_7d"`
+}
+
+type AIUsageModel struct {
+	ModelName  string  `json:"model_name"`
+	Tokens7D   int64   `json:"tokens_7d"`
+	Percentage float64 `json:"percentage"`
 }
 
 type AIUsageCodexCapacity struct {
@@ -118,7 +127,7 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 		historyStartedAt = time.Unix(data.HistoryStartedAt, 0).UTC()
 	}
 	response := &AIUsageResponse{
-		SchemaVersion: 3,
+		SchemaVersion: 4,
 		User: AIUsageUser{
 			UserID:   data.UserID,
 			Username: data.Username,
@@ -130,12 +139,30 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 		Keys:             make([]AIUsageKey, 0, len(data.Keys)),
 	}
 	for _, key := range data.Keys {
+		cacheHitRate := float64(0)
+		if key.PromptTokens7D > 0 {
+			cacheHitRate = math.Round(float64(key.CacheTokens7D)*10_000/float64(key.PromptTokens7D)) / 100
+		}
+		models := make([]AIUsageModel, 0, len(key.ModelDistribution))
+		for _, modelUsage := range key.ModelDistribution {
+			percentage := float64(0)
+			if key.Tokens7D > 0 {
+				percentage = math.Round(float64(modelUsage.Tokens7D)*10_000/float64(key.Tokens7D)) / 100
+			}
+			models = append(models, AIUsageModel{
+				ModelName:  modelUsage.ModelName,
+				Tokens7D:   modelUsage.Tokens7D,
+				Percentage: percentage,
+			})
+		}
 		response.Keys = append(response.Keys, AIUsageKey{
-			KeyID:     key.KeyID,
-			KeyLabel:  key.KeyLabel,
-			Tokens1D:  key.Tokens1D,
-			Tokens7D:  key.Tokens7D,
-			Tokens30D: key.Tokens30D,
+			KeyID:               key.KeyID,
+			KeyLabel:            key.KeyLabel,
+			Tokens1D:            key.Tokens1D,
+			Tokens7D:            key.Tokens7D,
+			Tokens30D:           key.Tokens30D,
+			CacheHitRate7D:      cacheHitRate,
+			ModelDistribution7D: models,
 		})
 	}
 	return response, nil

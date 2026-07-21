@@ -57,9 +57,9 @@ func TestGetAIUsageByUsernameReturnsCurrentKeysAndRollingTotals(t *testing.T) {
 	require.NoError(t, DB.Delete(&deleted).Error)
 
 	logs := []Log{
-		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 100, PromptTokens: 10, CompletionTokens: 5},
-		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 2*aiUsageDaySeconds, PromptTokens: 20, CompletionTokens: 10},
-		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 10*aiUsageDaySeconds, PromptTokens: 30, CompletionTokens: 15},
+		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 100, ModelName: "gpt-large", PromptTokens: 10, CompletionTokens: 5, Other: `{"cache_tokens":6}`},
+		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 2*aiUsageDaySeconds, ModelName: "gpt-small", PromptTokens: 20, CompletionTokens: 10, Other: `{"cache_tokens":4}`},
+		{TokenId: first.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 10*aiUsageDaySeconds, ModelName: "gpt-old", PromptTokens: 30, CompletionTokens: 15, Other: `{"cache_tokens":30}`},
 		{TokenId: first.Id, UserId: user.Id, Type: LogTypeTopup, CreatedAt: now - 50, PromptTokens: 999, CompletionTokens: 999},
 		{TokenId: deleted.Id, UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 50, PromptTokens: 999, CompletionTokens: 999},
 		{TokenId: other.Id, UserId: otherUser.Id, Type: LogTypeConsume, CreatedAt: now - 40*aiUsageDaySeconds, PromptTokens: 1, CompletionTokens: 1},
@@ -74,6 +74,11 @@ func TestGetAIUsageByUsernameReturnsCurrentKeysAndRollingTotals(t *testing.T) {
 	require.Len(t, usage.Keys, 2)
 	assert.Equal(t, AIUsageKey{
 		KeyID: first.Id, KeyLabel: "first", Tokens1D: 15, Tokens7D: 45, Tokens30D: 90,
+		PromptTokens7D: 30, CacheTokens7D: 10,
+		ModelDistribution: []AIUsageModel{
+			{ModelName: "gpt-small", Tokens7D: 30},
+			{ModelName: "gpt-large", Tokens7D: 15},
+		},
 	}, usage.Keys[0])
 	assert.Equal(t, AIUsageKey{
 		KeyID: second.Id, KeyLabel: "Key 2", Tokens1D: 0, Tokens7D: 0, Tokens30D: 0,
