@@ -38,7 +38,7 @@ permissions:
 jobs:
   record-completed-stripe-refund:
     if: ${{ inputs.operation == 'record_completed_stripe_refund' }}
-    runs-on: ubuntu-latest
+    runs-on: [solstice-deploy, deploy-only, linux-x64]
     environment: glimo-gateway-staging
     steps:
       - name: Validate and record completed Stripe Sandbox refund
@@ -141,7 +141,7 @@ jobs:
 
   sync-b2b-catalog-policy:
     if: ${{ inputs.operation == 'sync_b2b_catalog_policy' }}
-    runs-on: ubuntu-latest
+    runs-on: [solstice-deploy, deploy-only, linux-x64]
     environment: glimo-gateway-staging
     steps:
       - name: Synchronize the approved B2B auto-routing policy
@@ -290,7 +290,7 @@ jobs:
 
   verify-b2b-catalog-gate:
     if: ${{ inputs.operation == 'verify_b2b_catalog_gate' }}
-    runs-on: ubuntu-latest
+    runs-on: [solstice-deploy, deploy-only, linux-x64]
     environment: glimo-gateway-staging
     steps:
       - name: Verify B2B GPT Image is hidden and rejected before routing
