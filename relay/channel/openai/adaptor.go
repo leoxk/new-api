@@ -182,6 +182,19 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, header)
+	if info.RelayMode == relayconstant.RelayModeImagesGenerations || info.RelayMode == relayconstant.RelayModeImagesEdits {
+		idempotencyKey := c.GetHeader("Idempotency-Key")
+		if idempotencyKey == "" {
+			idempotencyKey = info.RequestId
+		}
+		if idempotencyKey != "" {
+			header.Set("Idempotency-Key", idempotencyKey)
+		}
+		if info.RequestId != "" {
+			header.Set("X-Request-Id", info.RequestId)
+		}
+		header.Set("X-Idempotency-Scope", fmt.Sprintf("%d:%d", info.UserId, info.TokenId))
+	}
 	if info.ChannelType == constant.ChannelTypeAzure {
 		header.Set("api-key", info.ApiKey)
 		return nil
