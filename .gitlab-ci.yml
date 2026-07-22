@@ -88,6 +88,8 @@ scan:container:
       -e TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD"
       -v "$CI_PROJECT_DIR/.cache/trivy:/root/.cache/trivy"
       aquasec/trivy:0.66.0 image
+      --image-src remote
+      --platform linux/arm64
       --exit-code 1 --ignore-unfixed --severity CRITICAL
       "$IMAGE_REF"
   after_script:
