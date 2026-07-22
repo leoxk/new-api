@@ -80,13 +80,16 @@ scan:container:
   before_script:
     - test -n "$IMAGE_REF"
     - install -d -m 0700 "$CI_PROJECT_DIR/.tmp/docker"
+    - install -d -m 0700 "$HOME/.cache/trivy"
     - printf '%s' "$CI_REGISTRY_PASSWORD" | docker --config "$CI_PROJECT_DIR/.tmp/docker" login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin >/dev/null
   script:
     - >-
       docker --config "$CI_PROJECT_DIR/.tmp/docker" run --rm
+      --user "$(id -u):$(id -g)"
       -e TRIVY_USERNAME="$CI_REGISTRY_USER"
       -e TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD"
-      -v "$CI_PROJECT_DIR/.cache/trivy:/root/.cache/trivy"
+      -e TRIVY_CACHE_DIR=/tmp/trivy-cache
+      -v "$HOME/.cache/trivy:/tmp/trivy-cache"
       aquasec/trivy:0.66.0 image
       --image-src remote
       --platform linux/arm64
@@ -94,10 +97,6 @@ scan:container:
       "$IMAGE_REF"
   after_script:
     - rm -rf "$CI_PROJECT_DIR/.tmp/docker"
-  cache:
-    key: trivy-db
-    paths:
-      - .cache/trivy/
 
 deploy:staging:
   extends: .deploy-runner
