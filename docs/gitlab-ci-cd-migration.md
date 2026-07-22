@@ -17,10 +17,12 @@ The root `.gitlab-ci.yml` provides these gates:
 1. `verify:new-api` installs pinned Go, Node, and Bun toolchains in the Build
    Runner cache, runs the frontend type-check/build, the Glimo B2B policy audit,
    and all Go tests.
-2. `build:arm64` uses the Build Runner's persistent Buildx builder, explicitly
-   builds `linux/arm64`, pushes to `registry.glimolab.com`, verifies the remote
-   manifest, and exports an immutable `IMAGE_REF` containing the registry
-   digest.
+2. `build:arm64` uses a stable, per-Runner Buildx `docker-container` builder.
+   Its BuildKit content store is the persistent local build cache; cache layers
+   are never imported from or exported to the Registry. The job explicitly
+   builds `linux/arm64`, pushes the release image to
+   `registry.glimolab.com`, verifies the remote manifest, and exports an
+   immutable `IMAGE_REF` containing the registry digest.
 3. `scan:container` blocks on unfixed critical vulnerabilities.
 4. `deploy:staging` is a manual protected-main job. It deploys the digest to
    the isolated payment staging Compose project and verifies local and public
