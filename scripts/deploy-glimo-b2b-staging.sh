@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [ "$#" -ne 6 ]; then
-  echo "usage: $0 DEPLOY_PATH IMAGE LOCAL_HEALTH_URL PUBLIC_HEALTH_URL RUNTIME_ENV COMPOSE_SOURCE" >&2
+if [ "$#" -lt 6 ] || [ "$#" -gt 7 ]; then
+  echo "usage: $0 DEPLOY_PATH IMAGE LOCAL_HEALTH_URL PUBLIC_HEALTH_URL RUNTIME_ENV COMPOSE_SOURCE [DOCKER_CONFIG]" >&2
   exit 2
 fi
 
@@ -12,7 +12,12 @@ local_health_url=$3
 public_health_url=$4
 runtime_env=$5
 compose_source=$6
+docker_config=${7:-}
 compose_file="$deploy_path/compose.yml"
+
+if [ -n "$docker_config" ]; then
+  export DOCKER_CONFIG=$docker_config
+fi
 
 # The compose file requires NEW_API_IMAGE during every command, including
 # inspection commands after startup. Export the requested image as the default;

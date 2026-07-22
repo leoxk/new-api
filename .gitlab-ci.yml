@@ -1,0 +1,201 @@
+stages:
+  - verify
+  - build
+  - scan
+  - deploy
+  - acceptance
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+default:
+  interruptible: false
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+variables:
+  GIT_DEPTH: "0"
+  GIT_STRATEGY: fetch
+  BUILDX_BUILDER: "new-api-gitlab-${CI_RUNNER_ID}"
+  IMAGE_TAG: "${CI_REGISTRY_IMAGE}:git-${CI_COMMIT_SHA}"
+  CLOUDFLARED_VERSION: "2026.7.2"
+  CLOUDFLARED_LINUX_AMD64_SHA256: "ec905ea7b7e327ff8abdde8cb64697a2152de74dbcdbf6aec9db8364eb3886cd"
+
+.build-runner:
+  tags:
+    - solstice-build
+    - build-only
+    - linux-x64
+
+.deploy-runner:
+  tags:
+    - solstice-deploy
+    - deploy-only
+    - linux-x64
+
+verify:new-api:
+  extends: .build-runner
+  stage: verify
+  timeout: 30m
+  script:
+    - bash ci/gitlab/verify.sh
+
+build:arm64:
+  extends: .build-runner
+  stage: build
+  timeout: 45m
+  needs:
+    - verify:new-api
+  before_script:
+    - install -d -m 0700 "$CI_PROJECT_DIR/.tmp/docker"
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker --config "$CI_PROJECT_DIR/.tmp/docker" login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin >/dev/null
+    - export DOCKER_CONFIG="$CI_PROJECT_DIR/.tmp/docker"
+  script:
+    - bash ci/gitlab/build-arm64-image.sh
+  after_script:
+    - rm -rf "$CI_PROJECT_DIR/.tmp/docker"
+  artifacts:
+    expire_in: 7 days
+    reports:
+      dotenv: build.env
+    paths:
+      - build.env
+      - image-metadata.json
+
+scan:container:
+  extends: .build-runner
+  stage: scan
+  timeout: 20m
+  needs:
+    - job: build:arm64
+      artifacts: true
+  before_script:
+    - test -n "$IMAGE_REF"
+    - install -d -m 0700 "$CI_PROJECT_DIR/.tmp/docker"
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker --config "$CI_PROJECT_DIR/.tmp/docker" login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin >/dev/null
+  script:
+    - >-
+      docker --config "$CI_PROJECT_DIR/.tmp/docker" run --rm
+      -e TRIVY_USERNAME="$CI_REGISTRY_USER"
+      -e TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD"
+      -v "$CI_PROJECT_DIR/.cache/trivy:/root/.cache/trivy"
+      aquasec/trivy:0.66.0 image
+      --exit-code 1 --ignore-unfixed --severity CRITICAL
+      "$IMAGE_REF"
+  after_script:
+    - rm -rf "$CI_PROJECT_DIR/.tmp/docker"
+  cache:
+    key: trivy-db
+    paths:
+      - .cache/trivy/
+
+deploy:staging:
+  extends: .deploy-runner
+  stage: deploy
+  timeout: 20m
+  needs:
+    - job: build:arm64
+      artifacts: true
+    - scan:container
+  environment:
+    name: staging
+    url: $STAGING_PUBLIC_HEALTH_URL
+  resource_group: new-api-staging
+  variables:
+    DEPLOY_TARGET: staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+    - when: never
+  script:
+    - bash ci/gitlab/deploy-staging.sh
+
+acceptance:staging:
+  extends: .deploy-runner
+  stage: acceptance
+  timeout: 10m
+  needs:
+    - job: build:arm64
+      artifacts: true
+    - deploy:staging
+  environment:
+    name: staging
+    url: $STAGING_PUBLIC_HEALTH_URL
+  resource_group: new-api-staging
+  variables:
+    DEPLOY_TARGET: staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: never
+  script:
+    - curl --fail --silent --show-error --retry 5 --retry-all-errors "$STAGING_PUBLIC_HEALTH_URL" >/dev/null
+    - echo "Staging public health acceptance passed for $IMAGE_REF"
+
+deploy:production:
+  extends: .deploy-runner
+  stage: deploy
+  timeout: 25m
+  needs:
+    - job: build:arm64
+      artifacts: true
+    - scan:container
+  environment:
+    name: production
+    url: $PRODUCTION_PUBLIC_HEALTH_URL
+  resource_group: new-api-production
+  variables:
+    DEPLOY_TARGET: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+    - when: never
+  script:
+    - bash ci/gitlab/deploy-production.sh
+
+acceptance:production:
+  extends: .deploy-runner
+  stage: acceptance
+  timeout: 10m
+  needs:
+    - job: build:arm64
+      artifacts: true
+    - deploy:production
+  environment:
+    name: production
+    url: $PRODUCTION_PUBLIC_HEALTH_URL
+  resource_group: new-api-production
+  variables:
+    DEPLOY_TARGET: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: never
+  script:
+    - curl --fail --silent --show-error --retry 5 --retry-all-errors "$PRODUCTION_PUBLIC_HEALTH_URL" >/dev/null
+    - curl --fail --silent --show-error --retry 5 --retry-all-errors "$PRODUCTION_ORIGIN_HEALTH_URL" >/dev/null
+    - echo "Production public and origin acceptance passed for $IMAGE_REF"
+
+staging:operation:
+  extends: .deploy-runner
+  stage: deploy
+  timeout: 15m
+  needs: []
+  environment:
+    name: staging
+    url: $STAGING_PUBLIC_HEALTH_URL
+  resource_group: new-api-staging-operations
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - when: never
+  script:
+    - bash ci/gitlab/staging-operation.sh
