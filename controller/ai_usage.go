@@ -44,3 +44,14 @@ func AIUsageOptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Status(http.StatusNoContent)
 }
+
+func GetCodexCapacity(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	capacity, err := service.GetCodexCapacity(time.Now())
+	if err != nil {
+		common.SysError("get Codex capacity failed: " + err.Error())
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Codex capacity unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, capacity)
+}

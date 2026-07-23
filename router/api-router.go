@@ -20,6 +20,8 @@ func SetApiRouter(router *gin.Engine) {
 	{
 		internalUsageRouter.GET("/ai-usage", controller.GetAIUsage)
 		internalUsageRouter.OPTIONS("/ai-usage", controller.AIUsageOptions)
+		internalUsageRouter.GET("/codex-capacity", controller.GetCodexCapacity)
+		internalUsageRouter.OPTIONS("/codex-capacity", controller.AIUsageOptions)
 	}
 
 	apiRouter := router.Group("/api")
