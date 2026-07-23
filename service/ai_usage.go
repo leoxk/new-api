@@ -2,18 +2,17 @@ package service
 
 import (
 	"math"
-	"os"
+	"sort"
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"golang.org/x/sync/singleflight"
 )
 
 const (
-	defaultAIUsageCapacityPath = "/quota-state/last-good.json"
-	aiUsageCacheTTL            = 5 * time.Minute
+	aiUsageCacheTTL = 5 * time.Minute
+	aiUsageTimezone = "Asia/Hong_Kong"
 )
 
 type aiUsageCacheEntry struct {
@@ -27,58 +26,51 @@ var (
 )
 
 type AIUsageResponse struct {
-	SchemaVersion    int                  `json:"schema_version"`
-	User             AIUsageUser          `json:"user"`
-	GeneratedAt      string               `json:"generated_at"`
-	Stale            bool                 `json:"stale"`
-	HistoryStartedAt string               `json:"history_started_at"`
-	CodexCapacity    AIUsageCodexCapacity `json:"codex_capacity"`
-	Keys             []AIUsageKey         `json:"keys"`
+	SchemaVersion int            `json:"schema_version"`
+	Company       AIUsageCompany `json:"company"`
+	GeneratedAt   string         `json:"generated_at"`
+	Period        AIUsagePeriod  `json:"period"`
+	Summary       AIUsageSummary `json:"summary"`
+	TopCostModels []AIUsageModel `json:"top_cost_models_this_week"`
+	Keys          []AIUsageKey   `json:"keys"`
 }
 
-type AIUsageUser struct {
-	UserID   int    `json:"user_id"`
+type AIUsageCompany struct {
 	Username string `json:"username"`
+	Timezone string `json:"timezone"`
+}
+
+type AIUsagePeriod struct {
+	TodayStartedAt string `json:"today_started_at"`
+	WeekStartedAt  string `json:"week_started_at"`
+}
+
+type AIUsageSummary struct {
+	QuotaUsedToday              int64 `json:"quota_used_today"`
+	QuotaUsedThisWeek           int64 `json:"quota_used_this_week"`
+	CompanyWalletRemainingQuota int64 `json:"company_wallet_remaining_quota"`
+	KeyCount                    int   `json:"key_count"`
 }
 
 type AIUsageKey struct {
-	KeyID               int            `json:"key_id"`
-	KeyLabel            string         `json:"key_label"`
-	Tokens1D            int64          `json:"tokens_1d"`
-	Tokens7D            int64          `json:"tokens_7d"`
-	Tokens30D           int64          `json:"tokens_30d"`
-	CacheHitRate7D      float64        `json:"cache_hit_rate_7d"`
-	ModelDistribution7D []AIUsageModel `json:"model_distribution_7d"`
+	KeyID                  int            `json:"key_id"`
+	KeyLabel               string         `json:"key_label"`
+	WeeklyQuota            int64          `json:"weekly_quota"`
+	WeeklyRemainingQuota   int64          `json:"weekly_remaining_quota"`
+	WeeklyRemainingPercent float64        `json:"weekly_remaining_percent"`
+	WeeklyQuotaUnlimited   bool           `json:"weekly_quota_unlimited"`
+	QuotaUsedToday         int64          `json:"quota_used_today"`
+	QuotaUsedThisWeek      int64          `json:"quota_used_this_week"`
+	ModelDistribution      []AIUsageModel `json:"model_distribution_this_week"`
 }
 
 type AIUsageModel struct {
-	ModelName  string  `json:"model_name"`
-	Tokens7D   int64   `json:"tokens_7d"`
-	Percentage float64 `json:"percentage"`
-}
-
-type AIUsageCodexCapacity struct {
-	FiveHour *AIUsageCapacityWindow `json:"five_hour"`
-	SevenDay *AIUsageCapacityWindow `json:"seven_day"`
-}
-
-type AIUsageCapacityWindow struct {
-	RemainingPercent float64 `json:"remaining_percent"`
-	ResetAt          string  `json:"reset_at"`
-}
-
-type aiUsageCapacityCache struct {
-	FiveHour             *aiUsageCapacityCacheWindow `json:"fiveHour"`
-	SevenDay             *aiUsageCapacityCacheWindow `json:"sevenDay"`
-	PrimaryUsedPercent   *float64                    `json:"primaryUsedPercent"`
-	PrimaryResetAt       *int64                      `json:"primaryResetAt"`
-	SecondaryUsedPercent *float64                    `json:"secondaryUsedPercent"`
-	SecondaryResetAt     *int64                      `json:"secondaryResetAt"`
-}
-
-type aiUsageCapacityCacheWindow struct {
-	UsedPercent float64 `json:"usedPercent"`
-	ResetAt     int64   `json:"resetAt"`
+	ModelName       string  `json:"model_name"`
+	Tokens          int64   `json:"tokens"`
+	TokenPercentage float64 `json:"token_percentage"`
+	ChargedQuota    int64   `json:"charged_quota"`
+	CostPercentage  float64 `json:"cost_percentage"`
+	RequestCount    int64   `json:"request_count"`
 }
 
 func GetAIUsage(username string, now time.Time) (*AIUsageResponse, error) {
@@ -117,91 +109,110 @@ func GetAIUsage(username string, now time.Time) (*AIUsageResponse, error) {
 }
 
 func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, error) {
-	data, err := model.GetAIUsageByUsername(username, now.Unix())
+	location, err := time.LoadLocation(aiUsageTimezone)
+	if err != nil {
+		return nil, err
+	}
+	generatedAt := now.In(location)
+	todayStartedAt := time.Date(generatedAt.Year(), generatedAt.Month(), generatedAt.Day(), 0, 0, 0, 0, location)
+	weekStartedAt := todayStartedAt.AddDate(0, 0, -((int(todayStartedAt.Weekday()) + 6) % 7))
+	data, err := model.GetAIUsageByUsername(username, todayStartedAt.Unix(), weekStartedAt.Unix())
 	if err != nil {
 		return nil, err
 	}
 
-	historyStartedAt := now
-	if data.HistoryStartedAt > 0 {
-		historyStartedAt = time.Unix(data.HistoryStartedAt, 0).UTC()
-	}
 	response := &AIUsageResponse{
-		SchemaVersion: 4,
-		User: AIUsageUser{
-			UserID:   data.UserID,
+		SchemaVersion: 5,
+		Company: AIUsageCompany{
 			Username: data.Username,
+			Timezone: aiUsageTimezone,
 		},
-		GeneratedAt:      now.Format(time.RFC3339Nano),
-		Stale:            false,
-		HistoryStartedAt: historyStartedAt.Format(time.RFC3339Nano),
-		CodexCapacity:    readAIUsageCodexCapacity(),
-		Keys:             make([]AIUsageKey, 0, len(data.Keys)),
+		GeneratedAt: generatedAt.Format(time.RFC3339Nano),
+		Period: AIUsagePeriod{
+			TodayStartedAt: todayStartedAt.Format(time.RFC3339Nano),
+			WeekStartedAt:  weekStartedAt.Format(time.RFC3339Nano),
+		},
+		Summary: AIUsageSummary{
+			CompanyWalletRemainingQuota: data.CompanyWalletRemainingQuota,
+			KeyCount:                    len(data.Keys),
+		},
+		TopCostModels: make([]AIUsageModel, 0),
+		Keys:          make([]AIUsageKey, 0, len(data.Keys)),
 	}
+	companyModels := make(map[string]*AIUsageModel)
 	for _, key := range data.Keys {
-		cacheHitRate := float64(0)
-		if key.PromptTokens7D > 0 {
-			cacheHitRate = math.Round(float64(key.CacheTokens7D)*10_000/float64(key.PromptTokens7D)) / 100
+		weeklyQuota := key.RemainQuota + key.QuotaUsedThisWeek
+		if key.UnlimitedQuota {
+			weeklyQuota = 0
 		}
-		models := make([]AIUsageModel, 0, len(key.ModelDistribution))
-		for _, modelUsage := range key.ModelDistribution {
-			percentage := float64(0)
-			if key.Tokens7D > 0 {
-				percentage = math.Round(float64(modelUsage.Tokens7D)*10_000/float64(key.Tokens7D)) / 100
+		usageKey := AIUsageKey{
+			KeyID:                key.KeyID,
+			KeyLabel:             key.KeyLabel,
+			WeeklyQuota:          weeklyQuota,
+			WeeklyRemainingQuota: key.RemainQuota,
+			WeeklyQuotaUnlimited: key.UnlimitedQuota,
+			QuotaUsedToday:       key.QuotaUsedToday,
+			QuotaUsedThisWeek:    key.QuotaUsedThisWeek,
+			ModelDistribution:    make([]AIUsageModel, 0, len(key.ModelDistribution)),
+		}
+		if weeklyQuota > 0 {
+			usageKey.WeeklyRemainingPercent = roundedPercentage(key.RemainQuota, weeklyQuota)
+		}
+		response.Summary.QuotaUsedToday += key.QuotaUsedToday
+		response.Summary.QuotaUsedThisWeek += key.QuotaUsedThisWeek
+
+		var keyTokens int64
+		for _, usage := range key.ModelDistribution {
+			keyTokens += usage.Tokens
+		}
+		for _, usage := range key.ModelDistribution {
+			modelUsage := AIUsageModel{
+				ModelName:       usage.ModelName,
+				Tokens:          usage.Tokens,
+				TokenPercentage: roundedPercentage(usage.Tokens, keyTokens),
+				ChargedQuota:    usage.ChargedQuota,
+				CostPercentage:  roundedPercentage(usage.ChargedQuota, key.QuotaUsedThisWeek),
+				RequestCount:    usage.RequestCount,
 			}
-			models = append(models, AIUsageModel{
-				ModelName:  modelUsage.ModelName,
-				Tokens7D:   modelUsage.Tokens7D,
-				Percentage: percentage,
-			})
+			usageKey.ModelDistribution = append(usageKey.ModelDistribution, modelUsage)
+			companyUsage := companyModels[usage.ModelName]
+			if companyUsage == nil {
+				companyUsage = &AIUsageModel{ModelName: usage.ModelName}
+				companyModels[usage.ModelName] = companyUsage
+			}
+			companyUsage.Tokens += usage.Tokens
+			companyUsage.ChargedQuota += usage.ChargedQuota
+			companyUsage.RequestCount += usage.RequestCount
 		}
-		response.Keys = append(response.Keys, AIUsageKey{
-			KeyID:               key.KeyID,
-			KeyLabel:            key.KeyLabel,
-			Tokens1D:            key.Tokens1D,
-			Tokens7D:            key.Tokens7D,
-			Tokens30D:           key.Tokens30D,
-			CacheHitRate7D:      cacheHitRate,
-			ModelDistribution7D: models,
+		response.Keys = append(response.Keys, usageKey)
+	}
+
+	var companyTokens int64
+	for _, usage := range companyModels {
+		companyTokens += usage.Tokens
+	}
+	for _, usage := range companyModels {
+		response.TopCostModels = append(response.TopCostModels, AIUsageModel{
+			ModelName:       usage.ModelName,
+			Tokens:          usage.Tokens,
+			TokenPercentage: roundedPercentage(usage.Tokens, companyTokens),
+			ChargedQuota:    usage.ChargedQuota,
+			CostPercentage:  roundedPercentage(usage.ChargedQuota, response.Summary.QuotaUsedThisWeek),
+			RequestCount:    usage.RequestCount,
 		})
 	}
+	sort.Slice(response.TopCostModels, func(i, j int) bool {
+		if response.TopCostModels[i].ChargedQuota == response.TopCostModels[j].ChargedQuota {
+			return response.TopCostModels[i].ModelName < response.TopCostModels[j].ModelName
+		}
+		return response.TopCostModels[i].ChargedQuota > response.TopCostModels[j].ChargedQuota
+	})
 	return response, nil
 }
 
-func readAIUsageCodexCapacity() AIUsageCodexCapacity {
-	path := os.Getenv("AI_USAGE_CAPACITY_PATH")
-	if path == "" {
-		path = defaultAIUsageCapacityPath
+func roundedPercentage(value int64, total int64) float64 {
+	if total <= 0 {
+		return 0
 	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return AIUsageCodexCapacity{}
-	}
-	var cache aiUsageCapacityCache
-	if err := common.Unmarshal(content, &cache); err != nil {
-		return AIUsageCodexCapacity{}
-	}
-
-	fiveHour := cache.FiveHour
-	if fiveHour == nil && cache.PrimaryUsedPercent != nil && cache.PrimaryResetAt != nil {
-		fiveHour = &aiUsageCapacityCacheWindow{UsedPercent: *cache.PrimaryUsedPercent, ResetAt: *cache.PrimaryResetAt}
-	}
-	sevenDay := cache.SevenDay
-	if sevenDay == nil && cache.SecondaryUsedPercent != nil && cache.SecondaryResetAt != nil {
-		sevenDay = &aiUsageCapacityCacheWindow{UsedPercent: *cache.SecondaryUsedPercent, ResetAt: *cache.SecondaryResetAt}
-	}
-	return AIUsageCodexCapacity{
-		FiveHour: formatAIUsageCapacityWindow(fiveHour),
-		SevenDay: formatAIUsageCapacityWindow(sevenDay),
-	}
-}
-
-func formatAIUsageCapacityWindow(window *aiUsageCapacityCacheWindow) *AIUsageCapacityWindow {
-	if window == nil {
-		return nil
-	}
-	return &AIUsageCapacityWindow{
-		RemainingPercent: 100 - window.UsedPercent,
-		ResetAt:          time.Unix(window.ResetAt, 0).UTC().Format(time.RFC3339Nano),
-	}
+	return math.Round(float64(value)*10_000/float64(total)) / 100
 }
