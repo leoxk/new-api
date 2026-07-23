@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -43,29 +44,29 @@ func TestGetAIUsageBuildsV5CostDistributionInHongKongTime(t *testing.T) {
 	assert.Equal(t, todayStartedAt.Format(time.RFC3339Nano), response.Period.TodayStartedAt)
 	assert.Equal(t, weekStartedAt.Format(time.RFC3339Nano), response.Period.WeekStartedAt)
 	assert.Equal(t, AIUsageSummary{
-		QuotaUsedToday:              120,
-		QuotaUsedThisWeek:           800,
-		CompanyWalletRemainingQuota: 9_000,
-		KeyCount:                    2,
+		CostUSDToday:              "0.00",
+		CostUSDThisWeek:           "0.00",
+		CompanyWalletRemainingUSD: "0.02",
+		KeyCount:                  2,
 	}, response.Summary)
 	require.Len(t, response.TopCostModels, 2)
 	assert.Equal(t, AIUsageModel{
-		ModelName: "gpt-5.6-sol", Tokens: 100, TokenPercentage: 9.09, ChargedQuota: 680, CostPercentage: 85, RequestCount: 1,
+		ModelName: "gpt-5.6-sol", Tokens: 100, TokenPercentage: 9.09, CostUSD: "0.00", ChargedQuota: 680, CostPercentage: 85, RequestCount: 1,
 	}, response.TopCostModels[0])
 	assert.Equal(t, AIUsageModel{
-		ModelName: "gpt-5.6-terra", Tokens: 1_000, TokenPercentage: 90.91, ChargedQuota: 120, CostPercentage: 15, RequestCount: 2,
+		ModelName: "gpt-5.6-terra", Tokens: 1_000, TokenPercentage: 90.91, CostUSD: "0.00", ChargedQuota: 120, CostPercentage: 15, RequestCount: 2,
 	}, response.TopCostModels[1])
 	require.Len(t, response.Keys, 2)
 	assert.Equal(t, AIUsageKey{
-		KeyID: firstKey.Id, KeyLabel: "BP - Alice", WeeklyQuota: 970, WeeklyRemainingQuota: 190,
-		WeeklyRemainingPercent: 19.59, QuotaUsedToday: 100, QuotaUsedThisWeek: 780,
+		KeyID: firstKey.Id, KeyLabel: "BP - Alice", WeeklyQuotaUSD: "0.00", WeeklyRemainingUSD: "0.00",
+		WeeklyRemainingPercent: 19.59, CostUSDToday: "0.00", CostUSDThisWeek: "0.00",
 		ModelDistribution: []AIUsageModel{
-			{ModelName: "gpt-5.6-sol", Tokens: 100, TokenPercentage: 10, ChargedQuota: 680, CostPercentage: 87.18, RequestCount: 1},
-			{ModelName: "gpt-5.6-terra", Tokens: 900, TokenPercentage: 90, ChargedQuota: 100, CostPercentage: 12.82, RequestCount: 1},
+			{ModelName: "gpt-5.6-sol", Tokens: 100, TokenPercentage: 10, CostUSD: "0.00", ChargedQuota: 680, CostPercentage: 87.18, RequestCount: 1},
+			{ModelName: "gpt-5.6-terra", Tokens: 900, TokenPercentage: 90, CostUSD: "0.00", ChargedQuota: 100, CostPercentage: 12.82, RequestCount: 1},
 		},
 	}, response.Keys[0])
-	assert.Equal(t, int64(420), response.Keys[1].WeeklyQuota)
-	assert.Equal(t, int64(20), response.Keys[1].QuotaUsedThisWeek)
+	assert.Equal(t, "0.00", response.Keys[1].WeeklyQuotaUSD)
+	assert.Equal(t, "0.00", response.Keys[1].CostUSDThisWeek)
 }
 
 func TestGetAIUsageCachesSuccessfulResponseForFiveMinutes(t *testing.T) {
@@ -83,7 +84,7 @@ func TestGetAIUsageCachesSuccessfulResponseForFiveMinutes(t *testing.T) {
 
 	first, err := GetAIUsage("babypro", now)
 	require.NoError(t, err)
-	assert.Equal(t, int64(50), first.Summary.QuotaUsedToday)
+	assert.Equal(t, "0.00", first.Summary.CostUSDToday)
 
 	secondKey := model.Token{UserId: user.Id, Key: "second-key", Name: "second", RemainQuota: 100}
 	require.NoError(t, mainDB.Create(&secondKey).Error)
@@ -100,7 +101,20 @@ func TestGetAIUsageCachesSuccessfulResponseForFiveMinutes(t *testing.T) {
 	refreshed, err := GetAIUsage("babypro", now.Add(aiUsageCacheTTL+time.Second))
 	require.NoError(t, err)
 	assert.Len(t, refreshed.Keys, 2)
-	assert.Equal(t, int64(80), refreshed.Summary.QuotaUsedToday)
+	assert.Equal(t, "0.00", refreshed.Summary.CostUSDToday)
+}
+
+func TestQuotaToUSDRoundsAndKeepsTwoDecimalPlaces(t *testing.T) {
+	assert.Equal(t, "1.00", quotaToUSD(500_000))
+	assert.Equal(t, "1.36", quotaToUSD(680_400))
+	assert.Equal(t, "1.20", quotaToUSD(600_000))
+	assert.Equal(t, "0.00", quotaToUSD(1))
+}
+
+func TestAIUsageModelSerializesUSDWithoutInternalQuota(t *testing.T) {
+	payload, err := json.Marshal(AIUsageModel{CostUSD: "1.20", ChargedQuota: 600_000})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"model_name":"","tokens":0,"token_percentage":0,"cost_usd":"1.20","cost_percentage":0,"request_count":0}`, string(payload))
 }
 
 func setupAIUsageDatabases(t *testing.T) (*gorm.DB, *gorm.DB) {

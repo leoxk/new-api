@@ -1,11 +1,13 @@
 package service
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"golang.org/x/sync/singleflight"
 )
@@ -46,21 +48,21 @@ type AIUsagePeriod struct {
 }
 
 type AIUsageSummary struct {
-	QuotaUsedToday              int64 `json:"quota_used_today"`
-	QuotaUsedThisWeek           int64 `json:"quota_used_this_week"`
-	CompanyWalletRemainingQuota int64 `json:"company_wallet_remaining_quota"`
-	KeyCount                    int   `json:"key_count"`
+	CostUSDToday              string `json:"cost_usd_today"`
+	CostUSDThisWeek           string `json:"cost_usd_this_week"`
+	CompanyWalletRemainingUSD string `json:"company_wallet_remaining_usd"`
+	KeyCount                  int    `json:"key_count"`
 }
 
 type AIUsageKey struct {
 	KeyID                  int            `json:"key_id"`
 	KeyLabel               string         `json:"key_label"`
-	WeeklyQuota            int64          `json:"weekly_quota"`
-	WeeklyRemainingQuota   int64          `json:"weekly_remaining_quota"`
+	WeeklyQuotaUSD         string         `json:"weekly_quota_usd"`
+	WeeklyRemainingUSD     string         `json:"weekly_remaining_usd"`
 	WeeklyRemainingPercent float64        `json:"weekly_remaining_percent"`
 	WeeklyQuotaUnlimited   bool           `json:"weekly_quota_unlimited"`
-	QuotaUsedToday         int64          `json:"quota_used_today"`
-	QuotaUsedThisWeek      int64          `json:"quota_used_this_week"`
+	CostUSDToday           string         `json:"cost_usd_today"`
+	CostUSDThisWeek        string         `json:"cost_usd_this_week"`
 	ModelDistribution      []AIUsageModel `json:"model_distribution_this_week"`
 }
 
@@ -68,9 +70,10 @@ type AIUsageModel struct {
 	ModelName       string  `json:"model_name"`
 	Tokens          int64   `json:"tokens"`
 	TokenPercentage float64 `json:"token_percentage"`
-	ChargedQuota    int64   `json:"charged_quota"`
+	CostUSD         string  `json:"cost_usd"`
 	CostPercentage  float64 `json:"cost_percentage"`
 	RequestCount    int64   `json:"request_count"`
+	ChargedQuota    int64   `json:"-"`
 }
 
 func GetAIUsage(username string, now time.Time) (*AIUsageResponse, error) {
@@ -133,13 +136,15 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 			WeekStartedAt:  weekStartedAt.Format(time.RFC3339Nano),
 		},
 		Summary: AIUsageSummary{
-			CompanyWalletRemainingQuota: data.CompanyWalletRemainingQuota,
-			KeyCount:                    len(data.Keys),
+			CompanyWalletRemainingUSD: quotaToUSD(data.CompanyWalletRemainingQuota),
+			KeyCount:                  len(data.Keys),
 		},
 		TopCostModels: make([]AIUsageModel, 0),
 		Keys:          make([]AIUsageKey, 0, len(data.Keys)),
 	}
 	companyModels := make(map[string]*AIUsageModel)
+	var companyQuotaUsedToday int64
+	var companyQuotaUsedThisWeek int64
 	for _, key := range data.Keys {
 		weeklyQuota := key.RemainQuota + key.QuotaUsedThisWeek
 		if key.UnlimitedQuota {
@@ -148,18 +153,18 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 		usageKey := AIUsageKey{
 			KeyID:                key.KeyID,
 			KeyLabel:             key.KeyLabel,
-			WeeklyQuota:          weeklyQuota,
-			WeeklyRemainingQuota: key.RemainQuota,
+			WeeklyQuotaUSD:       quotaToUSD(weeklyQuota),
+			WeeklyRemainingUSD:   quotaToUSD(key.RemainQuota),
 			WeeklyQuotaUnlimited: key.UnlimitedQuota,
-			QuotaUsedToday:       key.QuotaUsedToday,
-			QuotaUsedThisWeek:    key.QuotaUsedThisWeek,
+			CostUSDToday:         quotaToUSD(key.QuotaUsedToday),
+			CostUSDThisWeek:      quotaToUSD(key.QuotaUsedThisWeek),
 			ModelDistribution:    make([]AIUsageModel, 0, len(key.ModelDistribution)),
 		}
 		if weeklyQuota > 0 {
 			usageKey.WeeklyRemainingPercent = roundedPercentage(key.RemainQuota, weeklyQuota)
 		}
-		response.Summary.QuotaUsedToday += key.QuotaUsedToday
-		response.Summary.QuotaUsedThisWeek += key.QuotaUsedThisWeek
+		companyQuotaUsedToday += key.QuotaUsedToday
+		companyQuotaUsedThisWeek += key.QuotaUsedThisWeek
 
 		var keyTokens int64
 		for _, usage := range key.ModelDistribution {
@@ -170,9 +175,10 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 				ModelName:       usage.ModelName,
 				Tokens:          usage.Tokens,
 				TokenPercentage: roundedPercentage(usage.Tokens, keyTokens),
-				ChargedQuota:    usage.ChargedQuota,
+				CostUSD:         quotaToUSD(usage.ChargedQuota),
 				CostPercentage:  roundedPercentage(usage.ChargedQuota, key.QuotaUsedThisWeek),
 				RequestCount:    usage.RequestCount,
+				ChargedQuota:    usage.ChargedQuota,
 			}
 			usageKey.ModelDistribution = append(usageKey.ModelDistribution, modelUsage)
 			companyUsage := companyModels[usage.ModelName]
@@ -196,11 +202,14 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 			ModelName:       usage.ModelName,
 			Tokens:          usage.Tokens,
 			TokenPercentage: roundedPercentage(usage.Tokens, companyTokens),
-			ChargedQuota:    usage.ChargedQuota,
-			CostPercentage:  roundedPercentage(usage.ChargedQuota, response.Summary.QuotaUsedThisWeek),
+			CostUSD:         quotaToUSD(usage.ChargedQuota),
+			CostPercentage:  roundedPercentage(usage.ChargedQuota, companyQuotaUsedThisWeek),
 			RequestCount:    usage.RequestCount,
+			ChargedQuota:    usage.ChargedQuota,
 		})
 	}
+	response.Summary.CostUSDToday = quotaToUSD(companyQuotaUsedToday)
+	response.Summary.CostUSDThisWeek = quotaToUSD(companyQuotaUsedThisWeek)
 	sort.Slice(response.TopCostModels, func(i, j int) bool {
 		if response.TopCostModels[i].ChargedQuota == response.TopCostModels[j].ChargedQuota {
 			return response.TopCostModels[i].ModelName < response.TopCostModels[j].ModelName
@@ -208,6 +217,17 @@ func buildAIUsageResponse(username string, now time.Time) (*AIUsageResponse, err
 		return response.TopCostModels[i].ChargedQuota > response.TopCostModels[j].ChargedQuota
 	})
 	return response, nil
+}
+
+func quotaToUSD(quota int64) string {
+	if common.QuotaPerUnit <= 0 {
+		return "0.00"
+	}
+	cents := int64(math.Round(float64(quota) * 100 / common.QuotaPerUnit))
+	if cents < 0 {
+		return fmt.Sprintf("-%d.%02d", -cents/100, -cents%100)
+	}
+	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
 }
 
 func roundedPercentage(value int64, total int64) float64 {
