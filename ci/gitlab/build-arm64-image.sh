@@ -11,13 +11,16 @@ if ! docker buildx inspect "$BUILDX_BUILDER" >/dev/null 2>&1; then
 else
   docker buildx use "$BUILDX_BUILDER"
 fi
-# The stable per-runner docker-container builder keeps its BuildKit content
-# store on the runner. Do not export or import build cache through the registry.
+# Keep the per-runner BuildKit store and also share reusable layers when a job
+# lands on the other isolated build runner.
 docker buildx inspect --bootstrap | grep -Eq 'Platforms:.*linux/arm64'
 
 printf '%s\n' "$CI_COMMIT_SHA" > VERSION
+cache_ref="$CI_REGISTRY_IMAGE:buildcache"
 docker buildx build \
   --platform linux/arm64 \
+  --cache-from "type=registry,ref=$cache_ref" \
+  --cache-to "type=registry,ref=$cache_ref,mode=max,compression=zstd" \
   --push \
   --tag "$IMAGE_TAG" \
   --provenance mode=max \
