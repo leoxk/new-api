@@ -103,6 +103,17 @@ func ConsumeCodexWhamRateLimitResetCredit(
 	accessToken string,
 	accountID string,
 ) (statusCode int, body []byte, err error) {
+	return ConsumeCodexWhamRateLimitResetCreditWithRequestID(ctx, client, baseURL, accessToken, accountID, uuid.NewString())
+}
+
+func ConsumeCodexWhamRateLimitResetCreditWithRequestID(
+	ctx context.Context,
+	client *http.Client,
+	baseURL string,
+	accessToken string,
+	accountID string,
+	redeemRequestID string,
+) (statusCode int, body []byte, err error) {
 	if client == nil {
 		return 0, nil, fmt.Errorf("nil http client")
 	}
@@ -112,15 +123,19 @@ func ConsumeCodexWhamRateLimitResetCredit(
 	}
 	at := strings.TrimSpace(accessToken)
 	aid := strings.TrimSpace(accountID)
+	rid := strings.TrimSpace(redeemRequestID)
 	if at == "" {
 		return 0, nil, fmt.Errorf("empty accessToken")
 	}
 	if aid == "" {
 		return 0, nil, fmt.Errorf("empty accountID")
 	}
+	if rid == "" {
+		return 0, nil, fmt.Errorf("empty redeemRequestID")
+	}
 
 	requestBody, err := common.Marshal(map[string]string{
-		"redeem_request_id": uuid.NewString(),
+		"redeem_request_id": rid,
 	})
 	if err != nil {
 		return 0, nil, err

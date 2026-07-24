@@ -19,9 +19,32 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  AdminCodexCapacityResponse,
   SystemInstanceDeleteResponse,
   SystemInstanceListResponse,
 } from './types'
+
+export async function getAdminCodexCapacity() {
+  const res = await api.get<AdminCodexCapacityResponse>(
+    '/api/admin/codex-capacity'
+  )
+  return res.data
+}
+
+export async function postCodexResetCredit(
+  instanceId: string,
+  idempotencyKey: string
+) {
+  return api.post(
+    `/api/admin/codex-capacity/${encodeURIComponent(instanceId)}/reset`,
+    {
+      confirm: true,
+    },
+    {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    }
+  )
+}
 
 export async function listSystemInstances() {
   const res = await api.get<SystemInstanceListResponse>(

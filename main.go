@@ -126,6 +126,9 @@ func main() {
 	// Codex credential auto-refresh check every 10 minutes, refresh when expires within 1 day
 	service.StartCodexCredentialAutoRefreshTask()
 
+	// Collect non-sensitive Codex capacity and reset-credit state for configured OAuth instances.
+	service.StartCodexCapacityMonitor()
+
 	// Subscription quota reset task (daily/weekly/monthly/custom)
 	service.StartSubscriptionQuotaResetTask()
 

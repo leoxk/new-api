@@ -55,3 +55,47 @@ func GetCodexCapacity(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, capacity)
 }
+
+func GetAdminCodexCapacity(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	capacity, err := service.GetAdminCodexCapacity(time.Now())
+	if err != nil {
+		common.SysError("get admin Codex capacity failed: " + err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Codex capacity unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, capacity)
+}
+
+func ResetAdminCodexCapacity(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var body struct { Confirm bool `json:"confirm"` }
+	if err := c.ShouldBindJSON(&body); err != nil || !body.Confirm {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "confirm must be true"})
+		return
+	}
+	key := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if key == "" || utf8.RuneCountInString(key) > 128 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "a valid Idempotency-Key is required"})
+		return
+	}
+	op, err := service.UseCodexResetCredit(c.Request.Context(), c.Param("instance_id"), c.GetInt("id"), key)
+	if err != nil {
+		if errors.Is(err, service.ErrNoCodexResetCredit) {
+			c.JSON(http.StatusConflict, gin.H{"error": "no reset credit is available"})
+			return
+		}
+		if errors.Is(err, service.ErrCodexResetInProgress) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a reset operation is already pending for this OAuth instance"})
+			return
+		}
+		common.SysError("use Codex reset credit failed: " + err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Codex reset could not be completed", "operation": op})
+		return
+	}
+	if op.Status == model.CodexResetOperationUncertain || op.Status == model.CodexResetOperationPending {
+		c.JSON(http.StatusAccepted, op)
+		return
+	}
+	c.JSON(http.StatusOK, op)
+}

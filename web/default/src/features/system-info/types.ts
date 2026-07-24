@@ -85,3 +85,45 @@ export type SystemInstanceDeleteResponse = {
     deleted_count: number
   }
 }
+
+export type CodexCapacityWindow = {
+  remaining_percent: number
+  reset_at: string
+}
+
+export type CodexResetCredit = {
+  reset_type: string
+  status: string
+  title: string
+  description?: string
+  granted_at?: string
+  expires_at?: string
+  redeemed_at?: string
+}
+
+export type CodexCapacityInstance = {
+  id: string
+  display_name: string
+  allowed: boolean
+  stale: boolean
+  checked_at?: string
+  five_hour?: CodexCapacityWindow | null
+  seven_day?: CodexCapacityWindow | null
+  available_reset_count: number
+  credits: CodexResetCredit[]
+}
+
+export type AdminCodexCapacityResponse = {
+  capacity: {
+    instances: CodexCapacityInstance[]
+  }
+  recent_operations: Array<{
+    id: number
+    instance_id: string
+    actor_id: number
+    status: string
+    upstream_status: number
+    created_at: number
+    completed_at: number
+  }>
+}

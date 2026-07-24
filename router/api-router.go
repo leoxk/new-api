@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/service/authz"
 
 	// Import oauth package to register providers via init()
 	_ "github.com/QuantumNous/new-api/oauth"
@@ -29,6 +30,12 @@ func SetApiRouter(router *gin.Engine) {
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
 	apiRouter.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
+	codexCapacityAdminRoute := apiRouter.Group("/admin/codex-capacity")
+	codexCapacityAdminRoute.Use(middleware.AdminAuth(), middleware.RequirePermission(authz.ChannelOperate))
+	{
+		codexCapacityAdminRoute.GET("", controller.GetAdminCodexCapacity)
+		codexCapacityAdminRoute.POST("/:instance_id/reset", controller.ResetAdminCodexCapacity)
+	}
 	anonymousRequestBodyLimit := middleware.AnonymousRequestBodyLimit()
 	{
 		apiRouter.GET("/setup", controller.GetSetup)
