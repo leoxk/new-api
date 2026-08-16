@@ -1,4 +1,4 @@
-name: Glimo B2B staging
+name: GlimoLab AI Gateway - B2B staging
 
 on:
   pull_request:

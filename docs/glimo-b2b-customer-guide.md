@@ -1,4 +1,4 @@
-# Glimo AI Gateway B2B 客户指南
+# GlimoLab AI Gateway B2B 客户指南
 
 > 服务阶段：Best-effort Pilot，不承诺固定 SLA。客户账号须经 Glimo Lab 审批后开通；客户不需要了解或选择内部路由组。
 
@@ -86,7 +86,7 @@ Pilot 阶段暂不向 B2B 客户开放 GPT Image。`gpt-image-1`、`gpt-image-2`
 
 ## 人工退款
 
-通过 `contact@glimolab.com` 提交订单号、付款账号、退款原因和联系人；邮件主题建议使用 `Glimo AI Gateway support request`。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。Pilot 阶段经审核批准的退款不会从客户退款金额中扣除原交易的 Stripe 手续费；该费用由 Glimo Lab 承担。
+通过 `contact@glimolab.com` 提交订单号、付款账号、退款原因和联系人；邮件主题建议使用 `GlimoLab AI Gateway support request`。运营人员会核对成功充值、历史退款、当前余额及完整用量。仅未使用的 Recharge Balance 可原路退回；Promotional Credit 无现金价值。控制台没有自动退款按钮，任何退款都必须经人工确认。Pilot 阶段经审核批准的退款不会从客户退款金额中扣除原交易的 Stripe 手续费；该费用由 Glimo Lab 承担。
 
 ## 用量与排错
 

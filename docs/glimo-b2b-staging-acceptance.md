@@ -1,4 +1,4 @@
-# Glimo AI Gateway staging 验收与回滚
+# GlimoLab AI Gateway staging 验收与回滚
 
 ## 环境边界
 
